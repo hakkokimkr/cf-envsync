@@ -7,7 +7,7 @@
     ".": "./src/define-config.ts"
   },
   "bin": {
-    "envsync": "./dist/index.js"
+    "envsync": "dist/index.js"
   },
   "files": [
     "dist",
