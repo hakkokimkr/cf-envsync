@@ -89,7 +89,7 @@ envsync validate
 
 - [Node.js](https://nodejs.org) >= 18 or [Bun](https://bun.sh)
 - [wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI (peer dependency, for push/pull/diff)
-- [dotenvx](https://dotenvx.com) (optional, for encryption)
+- [dotenvx](https://dotenvx.com) (optional, only if using `encryption: "dotenvx"`)
 
 ---
 
@@ -284,10 +284,11 @@ envsync init --monorepo    # Scans for wrangler.jsonc files
 ```
 
 What it does:
+- Asks for encryption method (`password`, `dotenvx`, or `none`)
 - Scans `wrangler.jsonc` files to discover workers and environments
 - Detects shared secrets across apps
 - Creates `envsync.config.ts`, `.env.example`, and empty `.env.{environment}` files
-- Adds `.env.local`, `.env.keys`, `**/.dev.vars` to `.gitignore`
+- Adds `.env.local`, `.env.keys`, `.env.password`, `**/.dev.vars` to `.gitignore`
 - Registers the custom Git merge driver in `.gitattributes`
 
 ---
@@ -303,9 +304,33 @@ envsync normalize .env.staging # Specific file
 
 ---
 
+### `envsync encrypt` — Encrypt plain values
+
+Encrypts plain-text values in a `.env` file using password-based encryption (AES-256-GCM). Only available when `encryption: "password"`.
+
+```bash
+envsync encrypt staging           # Encrypt all plain values in .env.staging
+envsync encrypt production        # Encrypt .env.production
+envsync encrypt staging --dry-run # Preview without writing
+```
+
+```
+$ envsync encrypt staging
+
+  DATABASE_URL: encrypted
+  API_KEY: encrypted
+  JWT_SECRET: encrypted
+
+Encrypted 3 values in .env.staging (0 skipped)
+```
+
+Already-encrypted and empty values are skipped automatically.
+
+---
+
 ### `envsync merge` — Git merge driver
 
-A 3-way merge driver that understands dotenvx encryption. Registered automatically by `envsync init`.
+A 3-way merge driver that understands both dotenvx and password encryption. Registered automatically by `envsync init`.
 
 ```
 # .gitattributes (auto-generated)
@@ -315,10 +340,10 @@ A 3-way merge driver that understands dotenvx encryption. Registered automatical
 
 How it works:
 
-1. Decrypts all three versions (base, ours, theirs)
+1. Decrypts all three versions (base, ours, theirs) — supports both dotenvx and password encryption
 2. 3-way merge at the **key level** — not the encrypted ciphertext
 3. Only real conflicts get conflict markers
-4. Re-encrypts the merged result
+4. Re-encrypts the merged result (password mode uses `encryptEnvMap`, dotenvx uses `dotenvx encrypt`)
 
 No more fake conflicts from identical values with different ciphertext.
 
@@ -429,7 +454,7 @@ export default {
 | `envFiles.pattern` | `string` | File naming pattern. `{env}` is replaced. `local` falls back to `.env` |
 | `envFiles.local` | `string` | Per-developer override file (gitignored) |
 | `envFiles.perApp` | `boolean` | Allow per-app `.env.{env}` files for app-specific overrides |
-| `encryption` | `"dotenvx" \| "none"` | Encryption method for `.env` files |
+| `encryption` | `"password" \| "dotenvx" \| "none"` | Encryption method for `.env` files |
 | `apps.{name}.path` | `string` | Path to app directory relative to project root |
 | `apps.{name}.workers` | `Record<string, string>` | Worker name per environment |
 | `apps.{name}.secrets` | `string[]` | Secret keys pushed via `wrangler secret bulk` |
@@ -441,6 +466,48 @@ export default {
 </details>
 
 Config file search order: `envsync.config.ts` > `.js` > `.mjs` > `envsync.json` > `envsync.jsonc`
+
+### Encryption
+
+envsync supports three encryption modes:
+
+| Mode | How it works | Dependencies |
+|------|-------------|--------------|
+| `"password"` | AES-256-GCM, per-value encryption with a shared password. Values stored as `envsync:v1:{base64}`. | None (uses `node:crypto`) |
+| `"dotenvx"` | ECIES public/private key encryption via dotenvx CLI. | `dotenvx` CLI |
+| `"none"` | No encryption. `.env` files stored in plain text. | None |
+
+#### Password encryption
+
+Per-value encryption means each key-value pair is encrypted independently — git diffs are readable at the key level, and merges work cleanly.
+
+```
+# .env.staging (committed, encrypted)
+DATABASE_URL=envsync:v1:base64encodedpayload...
+API_KEY=envsync:v1:base64encodedpayload...
+```
+
+**Password source** (checked in order):
+
+1. `ENVSYNC_PASSWORD_{ENV}` env var (e.g. `ENVSYNC_PASSWORD_STAGING`)
+2. `ENVSYNC_PASSWORD` env var (generic fallback)
+3. `.env.password` file with `ENVSYNC_PASSWORD_{ENV}=xxx` (env-specific)
+4. `.env.password` file with `ENVSYNC_PASSWORD=xxx` (generic fallback)
+
+```bash
+# Quick setup
+echo "ENVSYNC_PASSWORD=your-strong-password" > .env.password
+
+# Or per-environment passwords
+cat > .env.password << 'EOF'
+ENVSYNC_PASSWORD_STAGING=staging-password
+ENVSYNC_PASSWORD_PRODUCTION=production-password
+EOF
+
+# Encrypt plain values
+envsync encrypt staging
+envsync encrypt production
+```
 
 ### File structure
 
@@ -454,6 +521,7 @@ project/
 ├── .env.local                      # Per-developer overrides (gitignored)
 ├── .env.example                    # Key reference (committed)
 ├── .env.keys                       # dotenvx private keys (gitignored)
+├── .env.password                   # Password encryption keys (gitignored)
 │
 ├── apps/
 │   ├── api/
@@ -468,7 +536,7 @@ project/
 │       ├── .dev.vars               # ← generated
 │       └── .env                    # app-specific secrets (YOUTUBE_API_KEY, etc.)
 │
-└── .gitignore                      # .env.local, .env.keys, **/.dev.vars
+└── .gitignore                      # .env.local, .env.keys, .env.password, **/.dev.vars
 ```
 
 ### Merge priority
@@ -515,7 +583,7 @@ export default defineConfig({
 <tr><td><strong>.dev.vars</strong></td><td>Local dev secrets</td><td>Doesn't sync with anything</td></tr>
 </table>
 
-**envsync** fills the gap: encrypted `.env` files as the single source of truth, synced to every target — Workers secrets, `.dev.vars`, validation — with monorepo and multi-environment support built in.
+**envsync** fills the gap: encrypted `.env` files as the single source of truth, synced to every target — Workers secrets, `.dev.vars`, validation — with monorepo and multi-environment support built in. Choose password encryption (zero dependencies, per-value, merge-friendly) or dotenvx (ECIES key pairs).
 
 No SaaS. No dashboard. Just a CLI, your `.env` files, and Cloudflare's API.
 
@@ -523,7 +591,7 @@ No SaaS. No dashboard. Just a CLI, your `.env` files, and Cloudflare's API.
 
 ## Testing
 
-102 tests across 18 files covering utils, core modules, and all 9 commands.
+150 tests across 20 files covering utils, core modules, and all 10 commands.
 
 ```bash
 bun test              # Run tests
@@ -556,7 +624,7 @@ bun test --coverage   # Run with coverage report
 | **CLI framework** | [citty](https://github.com/unjs/citty) |
 | **Output** | [consola](https://github.com/unjs/consola) |
 | **Config loading** | [jiti](https://github.com/unjs/jiti) |
-| **Encryption** | [@dotenvx/dotenvx](https://dotenvx.com) |
+| **Encryption** | `node:crypto` AES-256-GCM (password mode) / [@dotenvx/dotenvx](https://dotenvx.com) (dotenvx mode) |
 | **CF Secrets** | [wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI (shell out) |
 
 ---

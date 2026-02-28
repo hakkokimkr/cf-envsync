@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { readFile, writeFile } from "../utils/fs.ts";
-import { decryptEnvContent, findPrivateKey } from "../core/encryption.ts";
+import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap, encryptEnvMap, isEnvsyncEncrypted } from "../core/encryption.ts";
 import { exec } from "../utils/process.ts";
 
 /**
@@ -29,8 +29,22 @@ export function parseEnvLines(content: string): { key?: string; value?: string; 
 /**
  * Check if content appears to be dotenvx-encrypted.
  */
-export function isEncrypted(content: string): boolean {
+export function isDotenvxEncrypted(content: string): boolean {
   return content.includes("encrypted:");
+}
+
+/**
+ * Check if content contains envsync password-encrypted values.
+ */
+export function isPasswordEncrypted(content: string): boolean {
+  return content.includes("envsync:v1:");
+}
+
+/**
+ * Check if content is encrypted (dotenvx or password).
+ */
+export function isEncrypted(content: string): boolean {
+  return isDotenvxEncrypted(content) || isPasswordEncrypted(content);
 }
 
 /**
@@ -75,33 +89,35 @@ export default defineCommand({
       readFile(args.theirs),
     ]);
 
-    const wasEncrypted = isEncrypted(oursContent);
+    const wasDotenvx = isDotenvxEncrypted(oursContent);
+    const wasPassword = isPasswordEncrypted(oursContent);
+    const wasEncrypted = wasDotenvx || wasPassword;
+
     const privateKey = findPrivateKey(undefined, process.cwd());
+    const password = findPassword(undefined, process.cwd());
 
-    // Decrypt if encrypted
-    const baseParsed = isEncrypted(baseContent)
-      ? decryptEnvContent(baseContent, privateKey)
-      : Object.fromEntries(
-          parseEnvLines(baseContent)
+    function decryptContent(content: string): Record<string, string> {
+      if (isPasswordEncrypted(content)) {
+        const plain = Object.fromEntries(
+          parseEnvLines(content)
             .filter((e) => e.key)
             .map((e) => [e.key!, e.value ?? ""]),
         );
+        return password ? decryptEnvMap(plain, password) : plain;
+      }
+      if (isDotenvxEncrypted(content)) {
+        return decryptEnvContent(content, privateKey);
+      }
+      return Object.fromEntries(
+        parseEnvLines(content)
+          .filter((e) => e.key)
+          .map((e) => [e.key!, e.value ?? ""]),
+      );
+    }
 
-    const oursParsed = isEncrypted(oursContent)
-      ? decryptEnvContent(oursContent, privateKey)
-      : Object.fromEntries(
-          parseEnvLines(oursContent)
-            .filter((e) => e.key)
-            .map((e) => [e.key!, e.value ?? ""]),
-        );
-
-    const theirsParsed = isEncrypted(theirsContent)
-      ? decryptEnvContent(theirsContent, privateKey)
-      : Object.fromEntries(
-          parseEnvLines(theirsContent)
-            .filter((e) => e.key)
-            .map((e) => [e.key!, e.value ?? ""]),
-        );
+    const baseParsed = decryptContent(baseContent);
+    const oursParsed = decryptContent(oursContent);
+    const theirsParsed = decryptContent(theirsContent);
 
     // Build key maps
     const baseMap = new Map(Object.entries(baseParsed));
@@ -167,11 +183,23 @@ export default defineCommand({
     const mergedContent = resultLines.join("\n") + "\n";
 
     if (wasEncrypted && !hasConflicts) {
-      // Re-encrypt: write plain text, then run dotenvx encrypt
-      await writeFile(args.ours, mergedContent);
-      const result = await exec(["dotenvx", "encrypt", "-f", args.ours]);
-      if (!result.success) {
-        consola.warn("Could not re-encrypt merged file:", result.stderr);
+      if (wasPassword && password) {
+        // Re-encrypt with password: parse merged plain lines, encrypt values
+        const plainMap = Object.fromEntries(
+          parseEnvLines(mergedContent)
+            .filter((e) => e.key)
+            .map((e) => [e.key!, e.value ?? ""]),
+        );
+        const encrypted = encryptEnvMap(plainMap, password);
+        const encLines = Object.entries(encrypted).map(([k, v]) => `${k}=${v}`);
+        await writeFile(args.ours, encLines.join("\n") + "\n");
+      } else {
+        // Re-encrypt with dotenvx: write plain text, then run dotenvx encrypt
+        await writeFile(args.ours, mergedContent);
+        const result = await exec(["dotenvx", "encrypt", "-f", args.ours]);
+        if (!result.success) {
+          consola.warn("Could not re-encrypt merged file:", result.stderr);
+        }
       }
     } else {
       await writeFile(args.ours, mergedContent);

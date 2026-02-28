@@ -21,9 +21,11 @@ export async function resolveAppEnv(
 ): Promise<ResolvedEnv> {
   const layers: { source: string; map: EnvMap }[] = [];
 
+  const encryption = config.raw.encryption;
+
   // Layer 1: Root .env.{env}
   const rootEnvPath = getRootEnvPath(config, environment);
-  const rootEnv = await loadEnvFile(rootEnvPath, environment, config.projectRoot);
+  const rootEnv = await loadEnvFile(rootEnvPath, environment, config.projectRoot, encryption);
   if (Object.keys(rootEnv).length > 0) {
     layers.push({ source: rootEnvPath, map: rootEnv });
   }
@@ -32,7 +34,7 @@ export async function resolveAppEnv(
   if (config.raw.envFiles.perApp) {
     const appEnvPath = getAppEnvPath(config, app, environment);
     if (normalize(appEnvPath) !== normalize(rootEnvPath)) {
-      const appEnv = await loadEnvFile(appEnvPath, environment, config.projectRoot);
+      const appEnv = await loadEnvFile(appEnvPath, environment, config.projectRoot, encryption);
       if (Object.keys(appEnv).length > 0) {
         layers.push({ source: appEnvPath, map: appEnv });
       }

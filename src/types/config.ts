@@ -14,7 +14,7 @@ export interface EnvSyncConfig {
   };
 
   /** Encryption method */
-  encryption: "dotenvx" | "none";
+  encryption: "dotenvx" | "password" | "none";
 
   /** App definitions */
   apps: Record<string, AppConfig>;

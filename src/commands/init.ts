@@ -123,8 +123,8 @@ export default defineCommand({
     // Choose encryption
     const encryption = (await consola.prompt("Encryption method:", {
       type: "select",
-      options: ["dotenvx", "none"],
-    })) as "dotenvx" | "none";
+      options: ["password", "dotenvx", "none"],
+    })) as "dotenvx" | "password" | "none";
 
     // Environments
     const defaultEnvs = "local, staging, production";
@@ -344,7 +344,7 @@ export default defineCommand({
 
     // Update .gitignore
     const gitignorePath = join(cwd, ".gitignore");
-    const gitignoreEntries = [".env.local", ".env.keys", "**/.dev.vars"];
+    const gitignoreEntries = [".env.local", ".env.keys", ".env.password", "**/.dev.vars"];
     if (fileExists(gitignorePath)) {
       const existing = await readFile(gitignorePath);
       const toAdd = gitignoreEntries.filter((e) => !existing.includes(e));
@@ -389,13 +389,17 @@ export default defineCommand({
     }
 
     consola.info("\nNext steps:");
-    if (encryption === "dotenvx") {
+    if (encryption === "password") {
+      consola.info('  1. Set a password: echo "ENVSYNC_PASSWORD=your-secret" > .env.password');
+      consola.info("  2. Add values to your .env files (plain KEY=VALUE)");
+      consola.info("  3. envsync encrypt staging  (encrypts plain values in .env.staging)");
+    } else if (encryption === "dotenvx") {
       consola.info('  1. dotenvx set DATABASE_URL "value" -f .env');
       for (const env of environments.filter((e) => e !== "local")) {
         consola.info(`  2. dotenvx set DATABASE_URL "${env}_value" -f .env.${env}`);
       }
     }
-    consola.info(`  3. echo "OAUTH_REDIRECT_URL=https://your-tunnel/callback" >> .env.local`);
-    consola.info("  4. envsync dev");
+    consola.info(`  ${encryption === "password" ? "4" : "3"}. echo "OAUTH_REDIRECT_URL=https://your-tunnel/callback" >> .env.local`);
+    consola.info(`  ${encryption === "password" ? "5" : "4"}. envsync dev`);
   },
 });

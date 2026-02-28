@@ -79,7 +79,7 @@ export default defineCommand({
 
       // Load existing local env file for this environment
       const envFilePath = getRootEnvPath(config, environment);
-      const localEnv = await loadEnvFile(envFilePath, environment, config.projectRoot);
+      const localEnv = await loadEnvFile(envFilePath, environment, config.projectRoot, config.raw.encryption);
       const localKeys = new Set(Object.keys(localEnv));
 
       const missingKeys = remoteKeys.filter((k) => !localKeys.has(k));

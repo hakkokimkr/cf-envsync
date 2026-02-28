@@ -1,23 +1,53 @@
 import { join } from "node:path";
-import { decryptEnvContent, findPrivateKey } from "./encryption.ts";
+import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap } from "./encryption.ts";
 import { resolveEnvFilePath } from "./config.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
 import type { EnvEntry, EnvMap, ResolvedEnv } from "../types/env.ts";
 import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 
 /**
+ * Parse plain KEY=VALUE content into an EnvMap.
+ * Handles comments, blank lines, and quoted values.
+ */
+export function parsePlainEnv(content: string): EnvMap {
+  const result: EnvMap = {};
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    let value = trimmed.slice(eqIdx + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
  * Load a .env file and parse its contents.
- * Supports dotenvx-encrypted files.
+ * Supports dotenvx-encrypted and password-encrypted files.
  */
 export async function loadEnvFile(
   filePath: string,
   env?: string,
   projectRoot?: string,
+  encryption?: "dotenvx" | "password" | "none",
 ): Promise<EnvMap> {
   if (!fileExists(filePath)) {
     return {};
   }
   const content = await readFile(filePath);
+
+  if (encryption === "password") {
+    const envMap = parsePlainEnv(content);
+    const password = findPassword(env, projectRoot);
+    if (!password) return envMap;
+    return decryptEnvMap(envMap, password);
+  }
+
   const privateKey = findPrivateKey(env, projectRoot);
   return decryptEnvContent(content, privateKey);
 }
