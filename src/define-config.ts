@@ -6,7 +6,7 @@ import type { EnvSyncConfig } from "./types/config.ts";
  * @example
  * ```ts
  * // envsync.config.ts
- * import { defineConfig } from "envsync";
+ * import { defineConfig } from "cf-envsync";
  *
  * export default defineConfig({
  *   environments: ["local", "staging", "production"],

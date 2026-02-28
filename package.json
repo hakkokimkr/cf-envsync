@@ -1,5 +1,5 @@
 {
-  "name": "envsync",
+  "name": "cf-envsync",
   "version": "0.1.0",
   "description": "Sync .env files to Cloudflare Workers secrets, .dev.vars, and more",
   "type": "module",

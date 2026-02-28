@@ -18,7 +18,7 @@ interface WranglerConfig {
  */
 function generateConfigTS(config: EnvSyncConfig): string {
   const lines: string[] = [
-    `import { defineConfig } from "envsync";`,
+    `import { defineConfig } from "cf-envsync";`,
     ``,
     `export default defineConfig({`,
   ];

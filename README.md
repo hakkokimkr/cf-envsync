@@ -47,7 +47,7 @@ Every existing tool solves one piece. **envsync connects them all.**
 ## Quick Start
 
 ```bash
-bun add -d envsync
+bun add -d cf-envsync
 ```
 
 ```bash
@@ -310,7 +310,7 @@ No more fake conflicts from identical values with different ciphertext.
 The recommended way to configure envsync. Full type checking, autocomplete, and comments.
 
 ```ts
-import { defineConfig } from "envsync";
+import { defineConfig } from "cf-envsync";
 
 export default defineConfig({
   environments: ["local", "staging", "production"],
@@ -390,7 +390,7 @@ If you prefer plain JavaScript, use JSDoc for type checking:
 
 ```js
 // envsync.config.js
-/** @type {import("envsync").EnvSyncConfig} */
+/** @type {import("cf-envsync").EnvSyncConfig} */
 export default {
   environments: ["local", "staging", "production"],
   // ...
@@ -465,7 +465,7 @@ root .env.{env}  →  app .env.{env}  →  .env.local (local env only)
 Works the same way. Just one app with `path: "."`:
 
 ```ts
-import { defineConfig } from "envsync";
+import { defineConfig } from "cf-envsync";
 
 export default defineConfig({
   environments: ["local", "staging", "production"],
