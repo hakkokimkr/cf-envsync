@@ -8,6 +8,20 @@
 <h1 align="center">envsync</h1>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/cf-envsync"><img src="https://img.shields.io/npm/v/cf-envsync.svg" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/cf-envsync"><img src="https://img.shields.io/npm/dm/cf-envsync.svg" alt="npm downloads" /></a>
+  <a href="https://github.com/hakkokimkr/cf-envsync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/cf-envsync.svg" alt="license" /></a>
+  <a href="https://github.com/hakkokimkr/cf-envsync"><img src="https://img.shields.io/github/stars/hakkokimkr/cf-envsync.svg?style=social" alt="GitHub stars" /></a>
+</p>
+
+<p align="center">
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/cf-envsync.svg" alt="node version" /></a>
+  <a href="https://github.com/hakkokimkr/cf-envsync"><img src="https://img.shields.io/github/last-commit/hakkokimkr/cf-envsync.svg" alt="last commit" /></a>
+  <a href="https://github.com/hakkokimkr/cf-envsync/issues"><img src="https://img.shields.io/github/issues/hakkokimkr/cf-envsync.svg" alt="issues" /></a>
+  <img src="https://img.shields.io/badge/TypeScript-100%25-blue.svg" alt="TypeScript" />
+</p>
+
+<p align="center">
   One <code>.env</code> file. Every Worker. Every environment.<br />
   No SaaS. No dashboard. Just your repo.
 </p>
