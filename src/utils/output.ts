@@ -56,10 +56,10 @@ export function printDiff(entries: DiffEntry[]): void {
   for (const entry of entries) {
     switch (entry.status) {
       case "added":
-        consola.log(`  + ${entry.key} = ${maskValue(entry.remoteValue)}`);
+        consola.log(`  + ${entry.key} = ${maskValue(entry.localValue)}`);
         break;
       case "removed":
-        consola.log(`  - ${entry.key} = ${maskValue(entry.localValue)}`);
+        consola.log(`  - ${entry.key}`);
         break;
       case "changed":
         consola.log(`  ~ ${entry.key}`);

@@ -21,6 +21,9 @@ function envFlag(environment: string): string[] {
 /**
  * Push secrets to a Cloudflare Worker via `wrangler secret bulk`.
  * Pipes JSON to stdin.
+ *
+ * Uses `--name` to specify the worker. `--name` and `--env` can be used
+ * together (e.g. `wrangler secret bulk --name my-worker --env staging`).
  */
 export async function pushSecrets(
   workerName: string,

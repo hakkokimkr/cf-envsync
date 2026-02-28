@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test";
+import type { DiffEntry } from "../../src/types/env.ts";
 
 const FIXTURE = "/Users/hakko/Sources/cf-envsync/tests/fixtures/sample-project";
 const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
@@ -31,5 +32,66 @@ describe("diff command (env-vs-env mode)", () => {
     const { output } = await runDiff("staging", "production");
     expect(output).toContain("YOUTUBE_API_KEY");
     expect(output).toContain("missing");
+  });
+});
+
+describe("diff logic: local-vs-remote DiffEntry construction", () => {
+  /**
+   * Replicates the inline logic from diff.ts local-vs-remote mode
+   * to verify DiffEntry creation independently.
+   */
+  function buildDiffEntries(
+    localMap: Record<string, string>,
+    remoteKeys: string[],
+  ): DiffEntry[] {
+    const localKeys = new Set(Object.keys(localMap));
+    const remoteKeySet = new Set(remoteKeys);
+    const allKeys = new Set([...localKeys, ...remoteKeySet]);
+
+    const entries: DiffEntry[] = [];
+    for (const key of [...allKeys].sort()) {
+      const inLocal = localKeys.has(key);
+      const inRemote = remoteKeySet.has(key);
+
+      if (inLocal && !inRemote) {
+        entries.push({ key, status: "added", localValue: localMap[key] });
+      } else if (!inLocal && inRemote) {
+        entries.push({ key, status: "removed" });
+      } else {
+        entries.push({ key, status: "unchanged" });
+      }
+    }
+    return entries;
+  }
+
+  test("marks local-only keys as added", () => {
+    const entries = buildDiffEntries({ API_KEY: "secret" }, []);
+    expect(entries).toEqual([{ key: "API_KEY", status: "added", localValue: "secret" }]);
+  });
+
+  test("marks remote-only keys as removed", () => {
+    const entries = buildDiffEntries({}, ["OLD_SECRET"]);
+    expect(entries).toEqual([{ key: "OLD_SECRET", status: "removed" }]);
+  });
+
+  test("marks matching keys as unchanged", () => {
+    const entries = buildDiffEntries({ SHARED: "val" }, ["SHARED"]);
+    expect(entries).toEqual([{ key: "SHARED", status: "unchanged" }]);
+  });
+
+  test("handles mixed keys correctly", () => {
+    const entries = buildDiffEntries(
+      { A_LOCAL: "1", SHARED: "2" },
+      ["SHARED", "Z_REMOTE"],
+    );
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toEqual({ key: "A_LOCAL", status: "added", localValue: "1" });
+    expect(entries[1]).toEqual({ key: "SHARED", status: "unchanged" });
+    expect(entries[2]).toEqual({ key: "Z_REMOTE", status: "removed" });
+  });
+
+  test("returns empty array when both sides empty", () => {
+    const entries = buildDiffEntries({}, []);
+    expect(entries).toEqual([]);
   });
 });

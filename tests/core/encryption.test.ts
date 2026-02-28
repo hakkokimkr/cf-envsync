@@ -1,4 +1,7 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { decryptEnvContent, findPrivateKey } from "../../src/core/encryption.ts";
 
 describe("decryptEnvContent", () => {
@@ -63,5 +66,59 @@ describe("findPrivateKey", () => {
   test("returns DOTENV_PRIVATE_KEY when no env specified", () => {
     process.env.DOTENV_PRIVATE_KEY = "default-key";
     expect(findPrivateKey()).toBe("default-key");
+  });
+
+  describe(".env.keys file fallback", () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), "envsync-test-"));
+    });
+
+    afterEach(() => {
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    test("reads DOTENV_PRIVATE_KEY from .env.keys file", () => {
+      delete process.env.DOTENV_PRIVATE_KEY;
+      writeFileSync(join(tmpDir, ".env.keys"), "DOTENV_PRIVATE_KEY=file-key\n");
+      expect(findPrivateKey(undefined, tmpDir)).toBe("file-key");
+    });
+
+    test("reads env-specific key from .env.keys file", () => {
+      delete process.env.DOTENV_PRIVATE_KEY;
+      delete process.env.DOTENV_PRIVATE_KEY_STAGING;
+      writeFileSync(
+        join(tmpDir, ".env.keys"),
+        "DOTENV_PRIVATE_KEY_STAGING=staging-file-key\nDOTENV_PRIVATE_KEY=default-file-key\n",
+      );
+      expect(findPrivateKey("staging", tmpDir)).toBe("staging-file-key");
+    });
+
+    test("env var takes priority over .env.keys file", () => {
+      process.env.DOTENV_PRIVATE_KEY = "env-var-key";
+      writeFileSync(join(tmpDir, ".env.keys"), "DOTENV_PRIVATE_KEY=file-key\n");
+      expect(findPrivateKey(undefined, tmpDir)).toBe("env-var-key");
+    });
+
+    test("returns undefined when no .env.keys file and no env var", () => {
+      delete process.env.DOTENV_PRIVATE_KEY;
+      expect(findPrivateKey(undefined, tmpDir)).toBeUndefined();
+    });
+
+    test("handles .env.keys with comments and blank lines", () => {
+      delete process.env.DOTENV_PRIVATE_KEY;
+      writeFileSync(
+        join(tmpDir, ".env.keys"),
+        "# dotenvx keys\n\nDOTENV_PRIVATE_KEY=parsed-key\n# another comment\n",
+      );
+      expect(findPrivateKey(undefined, tmpDir)).toBe("parsed-key");
+    });
+
+    test("handles quoted values in .env.keys", () => {
+      delete process.env.DOTENV_PRIVATE_KEY;
+      writeFileSync(join(tmpDir, ".env.keys"), 'DOTENV_PRIVATE_KEY="quoted-key"\n');
+      expect(findPrivateKey(undefined, tmpDir)).toBe("quoted-key");
+    });
   });
 });

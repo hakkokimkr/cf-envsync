@@ -12,12 +12,13 @@ import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 export async function loadEnvFile(
   filePath: string,
   env?: string,
+  projectRoot?: string,
 ): Promise<EnvMap> {
   if (!fileExists(filePath)) {
     return {};
   }
   const content = await readFile(filePath);
-  const privateKey = findPrivateKey(env);
+  const privateKey = findPrivateKey(env, projectRoot);
   return decryptEnvContent(content, privateKey);
 }
 

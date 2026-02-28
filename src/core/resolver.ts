@@ -1,3 +1,4 @@
+import { normalize } from "node:path";
 import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 import type { EnvMap, ResolvedEnv } from "../types/env.ts";
 import {
@@ -22,7 +23,7 @@ export async function resolveAppEnv(
 
   // Layer 1: Root .env.{env}
   const rootEnvPath = getRootEnvPath(config, environment);
-  const rootEnv = await loadEnvFile(rootEnvPath, environment);
+  const rootEnv = await loadEnvFile(rootEnvPath, environment, config.projectRoot);
   if (Object.keys(rootEnv).length > 0) {
     layers.push({ source: rootEnvPath, map: rootEnv });
   }
@@ -30,8 +31,8 @@ export async function resolveAppEnv(
   // Layer 2: App-specific .env.{env} (if perApp enabled)
   if (config.raw.envFiles.perApp) {
     const appEnvPath = getAppEnvPath(config, app, environment);
-    if (appEnvPath !== rootEnvPath) {
-      const appEnv = await loadEnvFile(appEnvPath, environment);
+    if (normalize(appEnvPath) !== normalize(rootEnvPath)) {
+      const appEnv = await loadEnvFile(appEnvPath, environment, config.projectRoot);
       if (Object.keys(appEnv).length > 0) {
         layers.push({ source: appEnvPath, map: appEnv });
       }

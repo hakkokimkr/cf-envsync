@@ -76,7 +76,7 @@ export default defineCommand({
     ]);
 
     const wasEncrypted = isEncrypted(oursContent);
-    const privateKey = findPrivateKey();
+    const privateKey = findPrivateKey(undefined, process.cwd());
 
     // Decrypt if encrypted
     const baseParsed = isEncrypted(baseContent)

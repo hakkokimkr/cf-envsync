@@ -13,7 +13,9 @@ src/
 ├── types/                # config.ts (EnvSyncConfig, AppConfig), env.ts (EnvMap, DiffEntry, etc.)
 └── utils/                # fs.ts, process.ts, output.ts
 tests/
-├── core/                 # Unit tests for config, env-file, resolver
+├── commands/             # Command integration tests (dev, push, pull, diff, validate, list, normalize, merge)
+├── core/                 # Unit tests for config, env-file, encryption, resolver, wrangler
+├── utils/                # Unit tests for fs, output, process
 └── fixtures/             # Sample project with envsync.json + .env files
 ```
 
@@ -21,7 +23,7 @@ tests/
 
 - **Runtime**: Bun for dev/test, builds to Node.js-compatible bundle
 - **Build**: `bun run build` → `dist/index.js` (bundles all except jiti)
-- **Test**: `bun test` (26 tests across 3 files)
+- **Test**: `bun test` (102 tests across 18 files)
 - **Dev**: `bun run src/index.ts <command>`
 
 ## Key conventions

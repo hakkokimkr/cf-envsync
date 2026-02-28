@@ -47,6 +47,34 @@ describe("checkWrangler", () => {
 });
 
 describe("pushSecrets", () => {
+  test("handles empty secrets object", async () => {
+    mockExecFn.mockResolvedValueOnce({
+      stdout: "ok",
+      stderr: "",
+      exitCode: 0,
+      success: true,
+    });
+
+    const result = await pushSecrets("my-worker", {}, "staging");
+    expect(result.success).toBe(true);
+
+    const opts = mockExecFn.mock.calls[0]![1] as { stdin: string };
+    expect(opts.stdin).toBe("{}");
+  });
+
+  test("passes cwd to exec", async () => {
+    mockExecFn.mockResolvedValueOnce({
+      stdout: "ok",
+      stderr: "",
+      exitCode: 0,
+      success: true,
+    });
+
+    await pushSecrets("my-worker", { A: "1" }, "staging", "/my/project");
+    const opts = mockExecFn.mock.calls[0]![1] as { cwd: string };
+    expect(opts.cwd).toBe("/my/project");
+  });
+
   test("builds correct args for staging", async () => {
     mockExecFn.mockResolvedValueOnce({
       stdout: "ok",
