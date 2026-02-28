@@ -1,0 +1,515 @@
+# envsync — .env ↔ Cloudflare 시크릿 동기화 CLI
+
+## 문제 정의
+
+| 문제 | 현재 상황 |
+|------|-----------|
+| dotenvx 암호화 컨플릭트 | 같은 값도 매번 다른 암호문 → Git merge 불가능 |
+| 3개 레이어 분리 | Vite(`VITE_*`), Wrangler(`.dev.vars`), Workers 런타임(`env.XXX`) 각각 다른 파일 |
+| 개발자별 로컬 값 | OAuth redirect URL 등 터널 URL이 개발자마다 다름 |
+| Secrets Store 로컬 불일치 | 프로덕션은 `await .get()`, 로컬은 plain string |
+| wrangler.jsonc 정적 | 환경변수 보간(interpolation) 미지원 |
+
+## 핵심 아이디어
+
+**`.env` 파일 하나를 single source of truth로 두고, 각 타겟에 맞게 동기화**
+
+```
+.env                  ← 공유 시크릿 (암호화 커밋)
+.env.local            ← 개발자별 오버라이드 (gitignore)
+.env.example          ← 키 목록 + 설명 (커밋)
+        │
+        ▼
+   [ envsync ]
+        │
+        ├──→ Cloudflare Workers secrets  (wrangler secret bulk)
+        ├──→ Cloudflare Secrets Store    (API)
+        ├──→ .dev.vars                   (로컬 개발용)
+        └──→ 검증 (.env.example 기준)
+```
+
+## CLI 인터페이스
+
+```bash
+# 로컬 개발 (항상 local 환경)
+envsync dev                      # 전체 앱 .dev.vars 생성
+envsync dev api                  # 특정 앱만
+envsync dev api web              # 여러 앱 지정
+
+# 리모트 동기화 (환경 필수 지정)
+envsync push staging             # .env.staging → 전체 앱 staging 워커
+envsync push production          # .env.production → 전체 앱 production 워커
+envsync push staging api         # staging의 api 워커만
+envsync push production --shared # production 공유 시크릿만
+
+envsync pull staging             # staging 워커 secrets → .env.staging
+envsync pull production api      # production의 api만
+
+# 검증 & 비교
+envsync validate                 # 전체 환경, 전체 앱 키 누락 체크
+envsync validate staging         # staging만
+envsync validate staging api     # staging의 api만
+
+envsync diff staging             # .env.staging vs staging 워커 리모트
+envsync diff production api      # production api만
+
+# 셋업
+envsync init                     # 프로젝트 초기 셋업
+envsync init --monorepo          # 모노레포 구조 감지
+
+# 유틸
+envsync normalize                # 키 알파벳순 정렬 (모든 .env* 파일)
+envsync merge %O %A %B           # Git merge driver (자동 호출)
+envsync list                     # 앱 × 환경 매트릭스 확인
+envsync list api                 # 특정 앱의 환경별 키
+```
+
+## 설정 파일
+
+```jsonc
+// envsync.json (프로젝트 루트, 커밋)
+{
+  // 환경 정의
+  "environments": ["local", "staging", "production"],
+
+  // .env 파일 매핑
+  "envFiles": {
+    // 환경별 .env 파일 (dotenvx 암호화, 커밋)
+    //   local       → .env
+    //   staging     → .env.staging
+    //   production  → .env.production
+    "pattern": ".env.{env}",       // local은 .env로 폴백
+    "local": ".env.local",         // 개발자별 오버라이드 (gitignore)
+    "perApp": true                 // 앱별 .env.{env}도 허용
+  },
+
+  "encryption": "dotenvx",
+
+  // 앱 정의
+  "apps": {
+    "api": {
+      "path": "apps/api",
+      "workers": {
+        // 환경별 CF Worker 이름 (wrangler --env 매핑)
+        "staging": "my-app-api-staging",
+        "production": "my-app-api"
+      },
+      "secrets": [
+        "DATABASE_URL",            // 환경마다 값이 다름
+        "TWITCH_CLIENT_SECRET",
+        "TWITCH_CLIENT_ID",
+        "JWT_SECRET"
+      ],
+      "vars": ["API_URL", "ENVIRONMENT"]
+    },
+    "web": {
+      "path": "apps/web",
+      "workers": {
+        "staging": "my-app-web-staging",
+        "production": "my-app-web"
+      },
+      "secrets": ["AUTH_SECRET"],
+      "vars": [
+        "VITE_API_URL",            // staging: https://staging-api.example.com
+        "VITE_APP_URL"             // production: https://example.com
+      ]
+    },
+    "stream-collector": {
+      "path": "apps/stream-collector",
+      "workers": {
+        "staging": "my-app-collector-staging",
+        "production": "my-app-collector"
+      },
+      "secrets": [
+        "TWITCH_CLIENT_ID",
+        "TWITCH_CLIENT_SECRET",
+        "YOUTUBE_API_KEY",
+        "CHZZK_API_KEY"
+      ]
+    }
+  },
+
+  // 공유 시크릿 (환경 내에서 여러 앱이 같은 값)
+  "shared": [
+    "JWT_SECRET",
+    "TWITCH_CLIENT_ID",
+    "TWITCH_CLIENT_SECRET"
+  ],
+
+  // 개발자별 값 (local 환경에서만 적용)
+  "local": {
+    "overrides": ["OAUTH_REDIRECT_URL", "DEV_TUNNEL_URL"],
+    "perApp": {
+      "web": ["VITE_OAUTH_REDIRECT_URL"],
+      "api": ["OAUTH_REDIRECT_URL"]
+    }
+  }
+}
+```
+
+### 환경별 .env 파일 구조
+
+```
+monorepo/
+├── envsync.json
+│
+├── .env                          ← local 공유 시크릿 (암호화, 커밋)
+├── .env.staging                  ← staging 공유 시크릿 (암호화, 커밋)
+├── .env.production               ← production 공유 시크릿 (암호화, 커밋)
+├── .env.local                    ← 개발자별 오버라이드 (gitignore, local 전용)
+├── .env.example                  ← 전체 키 목록 (커밋)
+├── .env.keys                     ← dotenvx 복호화 키 전체 (gitignore)
+│
+├── apps/
+│   ├── api/
+│   │   ├── wrangler.jsonc        ← env.staging, env.production 정의됨
+│   │   ├── .dev.vars             ← [generated] envsync dev
+│   │   ├── .env                  ← [optional] api 전용 local 시크릿
+│   │   ├── .env.staging          ← [optional] api 전용 staging 시크릿
+│   │   └── .env.production       ← [optional] api 전용 production 시크릿
+│   │
+│   ├── web/
+│   │   └── ...
+│   └── stream-collector/
+│       └── ...
+│
+└── .gitignore
+```
+
+**환경별 값 예시:**
+
+```bash
+# .env (local)
+DATABASE_URL=postgres://localhost:5432/myapp_dev
+TWITCH_CLIENT_ID=dev_client_id
+API_URL=http://localhost:8787
+VITE_API_URL=http://localhost:8787
+VITE_APP_URL=http://localhost:3000
+
+# .env.staging
+DATABASE_URL=postgres://staging-db.example.com:5432/myapp
+TWITCH_CLIENT_ID=staging_client_id
+API_URL=https://staging-api.example.com
+VITE_API_URL=https://staging-api.example.com
+VITE_APP_URL=https://staging.example.com
+
+# .env.production
+DATABASE_URL=postgres://prod-db.example.com:5432/myapp
+TWITCH_CLIENT_ID=prod_client_id
+API_URL=https://api.example.com
+VITE_API_URL=https://api.example.com
+VITE_APP_URL=https://example.com
+```
+
+**머지 우선순위 (뒤가 이김):**
+```
+루트 .env.{env} → 앱별 .env.{env} → .env.local (local 환경만)
+```
+```
+
+## 핵심 명령어 상세
+
+### `envsync dev` — 로컬 개발 환경 셋업 (항상 local)
+
+개발자가 가장 많이 쓸 명령어. `.env` (local) + `.env.local` (개발자 오버라이드)을 머지해서 각 앱 경로에 `.dev.vars` 생성.
+
+```bash
+$ envsync dev
+
+✔ Loaded .env (15 keys, decrypted)
+✔ Loaded .env.local (3 overrides)
+✔ Loaded apps/stream-collector/.env (2 app-specific keys)
+
+  apps/api/.dev.vars
+  ├ DATABASE_URL           ← .env (local)
+  ├ TWITCH_CLIENT_SECRET   ← .env (shared)
+  ├ TWITCH_CLIENT_ID       ← .env (shared)
+  ├ JWT_SECRET             ← .env (shared)
+  └ OAUTH_REDIRECT_URL     ← .env.local (per-dev override)
+
+  apps/web/.dev.vars
+  ├ AUTH_SECRET             ← .env
+  └ VITE_OAUTH_REDIRECT_URL ← .env.local (per-dev override)
+
+  apps/stream-collector/.dev.vars
+  ├ TWITCH_CLIENT_ID       ← .env (shared)
+  ├ TWITCH_CLIENT_SECRET   ← .env (shared)
+  ├ YOUTUBE_API_KEY         ← apps/stream-collector/.env
+  └ CHZZK_API_KEY           ← apps/stream-collector/.env
+
+⚠ Missing in .env.local: DEV_TUNNEL_URL (required per-dev override)
+  → echo "DEV_TUNNEL_URL=https://your-tunnel.example.com" >> .env.local
+✔ Ready for: cd apps/api && wrangler dev
+```
+
+staging 환경으로 로컬 개발하고 싶을 때:
+```bash
+$ envsync dev --env staging        # .env.staging 기준으로 .dev.vars 생성
+```
+
+앱 하나만 셋업할 수도 있음:
+```bash
+$ envsync dev api              # apps/api/.dev.vars만 생성
+$ envsync dev web api          # 여러 앱 지정
+```
+
+내부 동작:
+```
+1. envsync.json 파싱 → 앱별 필요 키 목록 확인
+2. root .env 파싱 (dotenvx decrypt if encrypted)
+3. 앱별 .env 파싱 (있으면 머지)
+4. root .env.local 머지 (개발자 오버라이드)
+5. 앱별로 필요한 키만 필터링
+6. 각 앱 경로에 .dev.vars 생성
+7. local.overrides 기준으로 누락 체크
+```
+
+### `envsync push` — 환경별 리모트 동기화
+
+```bash
+$ envsync push staging
+
+✔ Decrypted .env.staging
+✔ Decrypted apps/stream-collector/.env.staging
+
+  my-app-api-staging (apps/api, --env staging)
+  ├ DATABASE_URL           ✔ updated
+  ├ TWITCH_CLIENT_SECRET   ✔ unchanged
+  ├ TWITCH_CLIENT_ID       ✔ unchanged
+  └ JWT_SECRET             ✔ updated
+
+  my-app-web-staging (apps/web, --env staging)
+  └ AUTH_SECRET            ✔ updated
+
+  my-app-collector-staging (apps/stream-collector, --env staging)
+  ├ TWITCH_CLIENT_ID       ✔ unchanged (shared, same as api)
+  ├ TWITCH_CLIENT_SECRET   ✔ unchanged (shared, same as api)
+  ├ YOUTUBE_API_KEY         ✔ updated
+  └ CHZZK_API_KEY           ✔ updated
+
+✔ Done: staging (4 updated, 4 skipped across 3 workers)
+```
+
+내부 동작:
+```
+1. .env.staging 복호화 (루트 + 앱별)
+2. 앱별 필요 키 필터링 (envsync.json 기준)
+3. 각 앱의 workers.staging 워커 이름으로
+   wrangler secret bulk --env staging 실행
+4. shared 키는 값 비교 후 동일하면 skip
+```
+
+```bash
+# production 배포 전 staging과 diff 확인
+$ envsync diff staging production
+
+  Key                  staging              production
+  ──────────────────────────────────────────────────────
+  DATABASE_URL         postgres://stg-...   postgres://prod-...  ✔ expected
+  API_URL              https://stg-api...   https://api...       ✔ expected
+  JWT_SECRET           sk_stg_xxx           sk_prod_xxx          ✔ expected
+  YOUTUBE_API_KEY      yt_stg_xxx           (missing)            ✘ missing in prod!
+```
+
+### `envsync validate` — 환경별 키 누락 체크
+
+```bash
+$ envsync validate
+
+Checking against .env.example...
+
+  local
+  ├ .env: all 15 keys present                            ✔
+  ├ .env.local: OAUTH_REDIRECT_URL ✔, DEV_TUNNEL_URL ✔   ✔
+  └ apps/stream-collector/.env: 2 keys present           ✔
+
+  staging
+  ├ .env.staging: all 15 keys present                    ✔
+  └ apps/stream-collector/.env.staging: 2 keys present   ✔
+
+  production
+  ├ .env.production: 14/15 keys                          ✘
+  │ └ missing: YOUTUBE_API_KEY
+  │   → dotenvx set YOUTUBE_API_KEY "value" -f .env.production
+  └ apps/stream-collector/.env.production: missing       ✘
+    └ missing: YOUTUBE_API_KEY, CHZZK_API_KEY
+
+⚠ 1 environment has issues
+```
+
+### `envsync diff` — 로컬 .env vs 리모트 비교
+
+```bash
+$ envsync diff production api
+
+  my-app-api (production)
+  .env.production vs remote secrets
+
+  Key                    Local              Remote
+  ─────────────────────────────────────────────────
+  DATABASE_URL           postgres://prod... postgres://prod...  ✔ match
+  JWT_SECRET             sk_new_xxx         sk_old_xxx          ✘ differs
+  NEW_KEY                present            (missing)           ✘ local only
+  DEPRECATED_KEY         (missing)          present             ⚠ remote only
+
+  → Run `envsync push production api` to sync
+```
+
+### `envsync init` — 프로젝트 초기 셋업
+
+```bash
+$ envsync init --monorepo
+
+? Encryption method: dotenvx
+? Environments: local, staging, production
+
+? Scanning for wrangler.jsonc files...
+  ✔ apps/api/wrangler.jsonc
+    ├ env.staging → my-app-api-staging
+    └ env.production → my-app-api
+  ✔ apps/web/wrangler.jsonc
+    ├ env.staging → my-app-web-staging
+    └ env.production → my-app-web
+  ✔ apps/stream-collector/wrangler.jsonc
+    ├ env.staging → my-app-collector-staging
+    └ env.production → my-app-collector
+
+? Detect shared secrets across apps? Yes
+  ✔ TWITCH_CLIENT_ID → api, stream-collector (shared)
+  ✔ JWT_SECRET → api, web (shared)
+
+✔ Created envsync.json
+✔ Created .env.example
+✔ Created .env, .env.staging, .env.production (empty, ready for dotenvx set)
+✔ Added to .gitignore: .env.local, .env.keys, **/.dev.vars
+✔ Registered Git merge driver (.gitattributes)
+✔ Done! Next steps:
+  1. dotenvx set DATABASE_URL "value" -f .env
+  2. dotenvx set DATABASE_URL "stg_value" -f .env.staging
+  3. dotenvx set DATABASE_URL "prod_value" -f .env.production
+  4. echo "OAUTH_REDIRECT_URL=https://your-tunnel/callback" >> .env.local
+  5. envsync dev
+```
+
+### `envsync list` — 앱 × 환경 매트릭스
+
+```bash
+$ envsync list
+
+  App               local              staging                    production
+  ─────────────────────────────────────────────────────────────────────────────
+  api               (dev)              my-app-api-staging         my-app-api
+                    4 secrets          4 secrets                  4 secrets
+
+  web               (dev)              my-app-web-staging         my-app-web
+                    1 secret, 2 vars   1 secret, 2 vars           1 secret, 2 vars
+
+  stream-collector  (dev)              my-app-collector-stg       my-app-collector
+                    4 secrets          4 secrets                  4 secrets
+
+  Shared secrets (3): TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, JWT_SECRET
+  Per-dev overrides (local only): OAUTH_REDIRECT_URL, VITE_OAUTH_REDIRECT_URL, DEV_TUNNEL_URL
+
+  .env files status:
+  ├ .env               ✔ encrypted (15 keys)
+  ├ .env.staging       ✔ encrypted (15 keys)
+  ├ .env.production    ✔ encrypted (14 keys) ⚠ missing 1
+  └ .env.local         ✔ present (3 overrides)
+```
+
+## 파일 구조 (모노레포 × 환경)
+
+```
+project/
+├── envsync.json              ← 앱 × 환경 매핑 (커밋)
+│
+│  # 루트 환경별 .env (공유 시크릿)
+├── .env                      ← local (dotenvx 암호화, 커밋)
+├── .env.staging              ← staging (암호화, 커밋)
+├── .env.production           ← production (암호화, 커밋)
+├── .env.local                ← 개발자별 오버라이드 (gitignore)
+├── .env.example              ← 전체 키 목록 + 설명 (커밋)
+├── .env.keys                 ← dotenvx 복호화 키 (gitignore)
+│
+├── apps/
+│   ├── api/
+│   │   ├── wrangler.jsonc    ← env.staging, env.production
+│   │   ├── .dev.vars         ← [generated, gitignore]
+│   │   ├── .env              ← [optional] api 전용 local
+│   │   ├── .env.staging      ← [optional] api 전용 staging
+│   │   └── .env.production   ← [optional] api 전용 production
+│   │
+│   ├── web/
+│   │   ├── wrangler.jsonc
+│   │   └── .dev.vars         ← [generated, gitignore]
+│   │
+│   └── stream-collector/
+│       ├── wrangler.jsonc
+│       ├── .dev.vars         ← [generated, gitignore]
+│       ├── .env              ← stream-collector 전용 (YOUTUBE_API_KEY 등)
+│       ├── .env.staging
+│       └── .env.production
+│
+├── packages/
+│   └── shared/
+│
+└── .gitignore
+```
+
+**싱글 프로젝트도 동일 패턴:**
+```jsonc
+{
+  "environments": ["local", "staging", "production"],
+  "apps": {
+    "default": {
+      "path": ".",
+      "workers": {
+        "staging": "my-worker-staging",
+        "production": "my-worker"
+      },
+      "secrets": ["DATABASE_URL", "API_KEY"]
+    }
+  }
+}
+```
+
+## dotenvx 컨플릭트 해결 전략
+
+dotenvx를 여전히 암호화에 사용하되, 컨플릭트를 구조적으로 회피:
+
+1. **`dotenvx set`만 사용** — 전체 re-encrypt 금지, 개별 키만 변경
+2. **커밋 전 normalize** — `envsync normalize`로 키를 알파벳순 정렬 → diff 최소화
+3. **Git merge driver 자동 등록** — `envsync init`이 `.gitattributes` + merge driver 셋업
+
+```bash
+# envsync init이 자동 생성
+# .gitattributes
+.env merge=envsync
+.env.* merge=envsync
+
+# .git/config
+[merge "envsync"]
+  name = envsync dotenvx merge
+  driver = envsync merge %O %A %B
+```
+
+`envsync merge` 내부:
+```
+1. 세 파일(base, ours, theirs) dotenvx로 복호화
+2. KEY=VALUE 단위로 3-way merge
+3. 같은 키를 둘 다 수정 → 진짜 컨플릭트만 마커 삽입
+4. 결과를 dotenvx로 재암호화
+```
+
+## 기술 스택
+
+```
+- Runtime: Node.js (Bun 호환)
+- 패키지: npm 배포 (npx envsync)
+- 의존성:
+  - @dotenvx/dotenvx (암호화/복호화)
+  - wrangler (CF secrets API, peer dep)
+  - @cloudflare/workers-types (타입)
+- 설정: envsync.json
+- Zero external service (SaaS 의존 없음)
+```

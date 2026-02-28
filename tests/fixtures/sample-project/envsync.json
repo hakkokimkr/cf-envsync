@@ -1,0 +1,55 @@
+{
+  "environments": ["local", "staging", "production"],
+  "envFiles": {
+    "pattern": ".env.{env}",
+    "local": ".env.local",
+    "perApp": true
+  },
+  "encryption": "dotenvx",
+  "apps": {
+    "api": {
+      "path": "apps/api",
+      "workers": {
+        "staging": "my-app-api-staging",
+        "production": "my-app-api"
+      },
+      "secrets": [
+        "DATABASE_URL",
+        "TWITCH_CLIENT_SECRET",
+        "TWITCH_CLIENT_ID",
+        "JWT_SECRET"
+      ],
+      "vars": ["API_URL", "ENVIRONMENT"]
+    },
+    "web": {
+      "path": "apps/web",
+      "workers": {
+        "staging": "my-app-web-staging",
+        "production": "my-app-web"
+      },
+      "secrets": ["AUTH_SECRET"],
+      "vars": ["VITE_API_URL", "VITE_APP_URL"]
+    },
+    "stream-collector": {
+      "path": "apps/stream-collector",
+      "workers": {
+        "staging": "my-app-collector-staging",
+        "production": "my-app-collector"
+      },
+      "secrets": [
+        "TWITCH_CLIENT_ID",
+        "TWITCH_CLIENT_SECRET",
+        "YOUTUBE_API_KEY",
+        "CHZZK_API_KEY"
+      ]
+    }
+  },
+  "shared": ["JWT_SECRET", "TWITCH_CLIENT_ID", "TWITCH_CLIENT_SECRET"],
+  "local": {
+    "overrides": ["OAUTH_REDIRECT_URL", "DEV_TUNNEL_URL"],
+    "perApp": {
+      "web": ["VITE_OAUTH_REDIRECT_URL"],
+      "api": ["OAUTH_REDIRECT_URL"]
+    }
+  }
+}

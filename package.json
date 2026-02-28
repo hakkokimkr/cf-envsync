@@ -1,0 +1,40 @@
+{
+  "name": "envsync",
+  "version": "0.1.0",
+  "description": "Sync .env files to Cloudflare Workers secrets, .dev.vars, and more",
+  "type": "module",
+  "exports": {
+    ".": "./src/define-config.ts"
+  },
+  "bin": {
+    "envsync": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "src/define-config.ts",
+    "src/types"
+  ],
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target node --external jiti",
+    "prepublishOnly": "bun run build",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "wrangler": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "wrangler": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@dotenvx/dotenvx": "^1.52.0",
+    "citty": "^0.2.1",
+    "consola": "^3.4.2",
+    "jiti": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22"
+  }
+}
