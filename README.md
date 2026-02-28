@@ -47,7 +47,14 @@ Every existing tool solves one piece. **envsync connects them all.**
 ## Quick Start
 
 ```bash
+# bun
 bun add -d cf-envsync
+
+# npm
+npm install -D cf-envsync
+
+# pnpm
+pnpm add -D cf-envsync
 ```
 
 ```bash
