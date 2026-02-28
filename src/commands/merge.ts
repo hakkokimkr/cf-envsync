@@ -8,7 +8,7 @@ import { exec } from "../utils/process.ts";
  * Parse .env content into an ordered list of entries.
  * Preserves comments and blank lines.
  */
-function parseEnvLines(content: string): { key?: string; value?: string; raw: string }[] {
+export function parseEnvLines(content: string): { key?: string; value?: string; raw: string }[] {
   return content.split("\n").map((line) => {
     const trimmed = line.trim();
     if (trimmed === "" || trimmed.startsWith("#")) {
@@ -29,7 +29,7 @@ function parseEnvLines(content: string): { key?: string; value?: string; raw: st
 /**
  * Check if content appears to be dotenvx-encrypted.
  */
-function isEncrypted(content: string): boolean {
+export function isEncrypted(content: string): boolean {
   return content.includes("encrypted:");
 }
 

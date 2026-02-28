@@ -77,7 +77,7 @@ export function printDiff(entries: DiffEntry[]): void {
 /**
  * Mask a secret value for display: show first 4 chars + "***".
  */
-function maskValue(value?: string): string {
+export function maskValue(value?: string): string {
   if (!value) return "(empty)";
   if (value.length <= 4) return "****";
   return value.slice(0, 4) + "****";

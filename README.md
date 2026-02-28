@@ -507,6 +507,33 @@ No SaaS. No dashboard. Just a CLI, your `.env` files, and Cloudflare's API.
 
 ---
 
+## Testing
+
+102 tests across 18 files covering utils, core modules, and all 9 commands.
+
+```bash
+bun test              # Run tests
+bun test --coverage   # Run with coverage report
+```
+
+### Coverage
+
+| File | % Funcs | % Lines |
+|------|---------|---------|
+| **All files** | **83.93** | **76.13** |
+| src/core/resolver.ts | 100.00 | 100.00 |
+| src/core/wrangler.ts | 100.00 | 100.00 |
+| src/core/env-file.ts | 100.00 | 98.65 |
+| src/core/encryption.ts | 100.00 | 95.65 |
+| src/utils/fs.ts | 100.00 | 97.44 |
+| src/core/config.ts | 71.43 | 76.23 |
+| src/commands/merge.ts | 75.00 | 28.40 |
+| src/utils/output.ts | 25.00 | 12.70 |
+
+> `merge.ts` and `output.ts` line coverage is lower because their command handlers and print functions are tested via CLI integration tests (spawned subprocesses), which bun's coverage instrumentation does not trace into.
+
+---
+
 ## Tech Stack
 
 | | |

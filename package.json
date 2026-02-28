@@ -18,7 +18,8 @@
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target node --external jiti",
     "prepublishOnly": "bun run build",
-    "test": "bun test"
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
   },
   "peerDependencies": {
     "wrangler": ">=3"
