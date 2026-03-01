@@ -111,7 +111,13 @@ export default defineCommand({
     const existingConfig = CONFIG_FILES.find((f) => fileExists(join(cwd, f)));
     if (existingConfig) {
       consola.warn(`${existingConfig} already exists.`);
-      const overwrite = await consola.prompt("Overwrite?", {
+      const existingContent = await readFile(join(cwd, existingConfig));
+      const lines = existingContent.split("\n");
+      const preview = lines.length > 20
+        ? [...lines.slice(0, 20), `  ... (${lines.length - 20} more lines)`].join("\n")
+        : existingContent;
+      consola.log(`\nCurrent config:\n${preview}\n`);
+      const overwrite = await consola.prompt("Overwrite with new config?", {
         type: "confirm",
       });
       if (!overwrite) {
@@ -150,7 +156,10 @@ export default defineCommand({
       });
 
       if (wranglerFiles.length === 0) {
-        consola.warn("No wrangler config files found. Creating manually.");
+        consola.warn(
+          "No wrangler.json or wrangler.jsonc files found (searched all subdirectories, excluding node_modules).\n" +
+          "  Falling back to manual configuration.",
+        );
       }
 
       for (const wranglerFile of wranglerFiles.sort()) {

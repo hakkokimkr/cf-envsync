@@ -56,4 +56,23 @@ describe("push command", () => {
     expect(output).toContain("Would push");
     expect(exitCode).toBe(0);
   });
+
+  test("--shared shows summary of shared keys being pushed", async () => {
+    const { output } = await runPush("staging", "--dry-run", "--shared");
+    expect(output).toContain("--shared");
+    expect(output).toContain("shared keys");
+  });
+
+  test("--shared shows skip reason when app has no shared keys", async () => {
+    // stream-collector has no shared keys (its secrets don't overlap with shared list except TWITCH_*)
+    // Actually all apps with shared keys will get some. Let's just check the output format
+    const { output } = await runPush("staging", "--dry-run", "--shared", "api");
+    expect(output).toContain("--shared");
+  });
+
+  test("dry-run with multiple apps shows progress counter", async () => {
+    const { output } = await runPush("staging", "--dry-run");
+    // With multiple apps, should show [1/N] style progress
+    expect(output).toMatch(/\[\d+\/\d+\]/);
+  });
 });

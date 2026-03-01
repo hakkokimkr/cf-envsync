@@ -86,10 +86,12 @@ export default defineCommand({
       ...Object.values(config.raw.local?.perApp ?? {}).flat(),
     ]);
 
-    consola.log("\nChecking against .env.example...");
+    const totalChecks = environments.length * apps.length;
+    consola.log(`\nChecking against .env.example... (${environments.length} env × ${apps.length} app${apps.length > 1 ? "s" : ""})`);
 
     const results: ValidationResult[] = [];
     let hasIssues = false;
+    let checkIdx = 0;
 
     for (const environment of environments) {
       consola.log(`\n  ${environment}`);

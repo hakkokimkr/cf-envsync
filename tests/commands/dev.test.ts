@@ -95,4 +95,21 @@ describe("dev command", () => {
     expect(fileExists(join(dir, "apps", "web", ".dev.vars"))).toBe(false);
     expect(fileExists(join(dir, "apps", "stream-collector", ".dev.vars"))).toBe(false);
   });
+
+  test("shows per-dev override info when using non-local env", async () => {
+    const dir = await setupTmpProject();
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev", "--env", "staging"], {
+      cwd: dir,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: spawnEnv,
+    });
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    const output = stdout + stderr;
+    expect(output).toContain("Per-dev overrides are only applied");
+  });
 });

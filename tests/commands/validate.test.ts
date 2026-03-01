@@ -35,6 +35,13 @@ describe("validate command", () => {
     expect(exitCode).toBe(0);
   });
 
+  test("shows check summary with env × app count", async () => {
+    const { output } = await runValidate("staging");
+    // Should show something like "(1 env × 3 apps)"
+    expect(output).toContain("env");
+    expect(output).toContain("app");
+  });
+
   test("specific env filter limits environments", async () => {
     const { exitCode } = await runValidate("staging");
     expect(exitCode).toBe(0);

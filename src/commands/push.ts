@@ -95,14 +95,25 @@ export default defineCommand({
     const sharedKeys = new Set(config.raw.shared ?? []);
     let hasFailure = false;
 
-    for (const app of apps) {
+    // Show --shared summary when used
+    if (args.shared) {
+      if (sharedKeys.size === 0) {
+        consola.error("No shared keys defined in config. Nothing to push with --shared.");
+        process.exit(1);
+      }
+      consola.info(`--shared: pushing only shared keys (${[...sharedKeys].join(", ")})`);
+    }
+
+    for (let i = 0; i < apps.length; i++) {
+      const app = apps[i]!;
+      const progress = apps.length > 1 ? `[${i + 1}/${apps.length}] ` : "";
       const workerName = getWorkerName(app, environment);
       if (!workerName) {
-        consola.warn(`  No worker defined for ${app.name} in ${environment}. Skipping.`);
+        consola.warn(`${progress}No worker defined for ${app.name} in ${environment}. Skipping.`);
         continue;
       }
 
-      consola.start(`Pushing secrets for ${app.name} → ${workerName} (${environment})...`);
+      consola.start(`${progress}Pushing secrets for ${app.name} → ${workerName} (${environment})...`);
 
       const resolved = await resolveAppEnv(config, app, environment);
       let secretsToPush: EnvMap;
@@ -129,7 +140,8 @@ export default defineCommand({
       const keyCount = Object.keys(secretsToPush).length;
 
       if (keyCount === 0) {
-        consola.warn(`  No secrets to push for ${app.name}. Skipping.`);
+        const reason = args.shared ? " (no shared keys for this app)" : "";
+        consola.warn(`  No secrets to push for ${app.name}${reason}. Skipping.`);
         continue;
       }
 

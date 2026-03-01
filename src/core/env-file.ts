@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { consola } from "consola";
 import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap } from "./encryption.ts";
 import { resolveEnvFilePath } from "./config.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
@@ -40,6 +41,25 @@ export async function loadEnvFile(
     return {};
   }
   const content = await readFile(filePath);
+
+  // Detect encryption format mismatch
+  if (encryption) {
+    const hasEnvsyncValues = content.includes("envsync:v1:");
+    const hasDotenvxValues = content.includes("encrypted:");
+
+    if (encryption === "dotenvx" && hasEnvsyncValues) {
+      consola.warn(
+        `${filePath}: config uses encryption: "dotenvx" but file contains "envsync:v1:" (password-encrypted) values. ` +
+        `Check your encryption setting.`,
+      );
+    }
+    if (encryption === "password" && hasDotenvxValues && !hasEnvsyncValues) {
+      consola.warn(
+        `${filePath}: config uses encryption: "password" but file contains dotenvx-encrypted values. ` +
+        `Check your encryption setting.`,
+      );
+    }
+  }
 
   if (encryption === "password") {
     const envMap = parsePlainEnv(content);

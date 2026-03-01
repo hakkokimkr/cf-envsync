@@ -117,6 +117,14 @@ export default defineCommand({
       }
     }
 
+    if (environment !== "local") {
+      const hasOverrides = (config.raw.local?.overrides?.length ?? 0) > 0 ||
+        Object.keys(config.raw.local?.perApp ?? {}).length > 0;
+      if (hasOverrides) {
+        consola.info(`Per-dev overrides are only applied in "local" environment (current: ${environment}).`);
+      }
+    }
+
     consola.success("\nDone!");
   },
 });

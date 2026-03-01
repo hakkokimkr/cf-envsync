@@ -1,4 +1,5 @@
-import { normalize } from "node:path";
+import { normalize, relative } from "node:path";
+import { consola } from "consola";
 import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 import type { EnvMap, ResolvedEnv } from "../types/env.ts";
 import {
@@ -9,6 +10,9 @@ import {
   getAppEnvPath,
   getLocalOverridePath,
 } from "./env-file.ts";
+import { fileExists } from "../utils/fs.ts";
+
+const warnedMissingFiles = new Set<string>();
 
 /**
  * Resolve the full env map for an app in a given environment.
@@ -25,6 +29,10 @@ export async function resolveAppEnv(
 
   // Layer 1: Root .env.{env}
   const rootEnvPath = getRootEnvPath(config, environment);
+  if (!fileExists(rootEnvPath) && environment !== "local" && !warnedMissingFiles.has(rootEnvPath)) {
+    warnedMissingFiles.add(rootEnvPath);
+    consola.warn(`Missing env file: ${relative(config.projectRoot, rootEnvPath)} (create it or run \`envsync init\`)`);
+  }
   const rootEnv = await loadEnvFile(rootEnvPath, environment, config.projectRoot, encryption);
   if (Object.keys(rootEnv).length > 0) {
     layers.push({ source: rootEnvPath, map: rootEnv });
