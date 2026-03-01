@@ -40,12 +40,26 @@ export default defineCommand({
     let appNames: string[] | undefined;
 
     if (envArg && config.environments.includes(envArg)) {
+      // Ambiguity check: first arg matches both an env name and an app name
+      if (envArg in config.apps) {
+        consola.error(
+          `"${envArg}" is both an environment and an app name. This is ambiguous.`,
+        );
+        consola.info(
+          `  To validate environment: envsync validate ${envArg} --\n` +
+          `  To validate app:         envsync validate -- ${envArg}`,
+        );
+        process.exit(1);
+      }
       environments = [envArg];
       appNames = parseAppNames(args as unknown as { _?: string[] });
     } else if (envArg) {
       // First arg is not an env — treat all args as app names, validate all envs
       environments = config.environments;
       appNames = parseAppNames(args as unknown as { _?: string[] }, 0);
+      consola.info(
+        `"${envArg}" is not an environment. Treating as app name. Validating all environments.`,
+      );
     } else {
       environments = config.environments;
       appNames = undefined;

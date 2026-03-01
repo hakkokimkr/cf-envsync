@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { mkdtemp, rm, copyFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-const FIXTURE = "/Users/hakko/Sources/cf-envsync/tests/fixtures/sample-project";
-const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+const FIXTURE = join(import.meta.dir, "../fixtures/sample-project");
+const CLI = join(import.meta.dir, "../../src/index.ts");
 const spawnEnv = { ...process.env, CONSOLA_LEVEL: "5" };
 
 let tmpDir: string;
@@ -28,7 +28,7 @@ describe("pull command", () => {
   test("fails gracefully when wrangler not available", async () => {
     const dir = await setupTmpProject();
 
-    const proc = Bun.spawn(["bun", "run", CLI, "pull", "staging"], {
+    const proc = Bun.spawn([process.execPath, "run", CLI, "pull", "staging"], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",

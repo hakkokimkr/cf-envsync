@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { fileExists } from "../../src/utils/fs.ts";
 import { loadEnvFile } from "../../src/core/env-file.ts";
 
-const FIXTURE = "/Users/hakko/Sources/cf-envsync/tests/fixtures/sample-project";
-const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+const FIXTURE = join(import.meta.dir, "../fixtures/sample-project");
+const CLI = join(import.meta.dir, "../../src/index.ts");
 const spawnEnv = { ...process.env, CONSOLA_LEVEL: "5" };
 
 let tmpDirs: string[] = [];
@@ -32,7 +32,7 @@ afterAll(async () => {
 describe("dev command", () => {
   test("writes correct .dev.vars files", async () => {
     const dir = await setupTmpProject();
-    const proc = Bun.spawn(["bun", "run", CLI, "dev"], {
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev"], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",
@@ -61,7 +61,7 @@ describe("dev command", () => {
 
   test("dry-run does not write .dev.vars", async () => {
     const dir = await setupTmpProject();
-    const proc = Bun.spawn(["bun", "run", CLI, "dev", "--dry-run"], {
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev", "--dry-run"], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",
@@ -79,7 +79,7 @@ describe("dev command", () => {
 
   test("app filter works", async () => {
     const dir = await setupTmpProject();
-    const proc = Bun.spawn(["bun", "run", CLI, "dev", "api"], {
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev", "api"], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",

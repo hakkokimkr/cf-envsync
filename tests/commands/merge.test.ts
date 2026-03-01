@@ -46,7 +46,7 @@ describe("isEncrypted", () => {
 });
 
 describe("3-way merge", () => {
-  const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+  const CLI = join(import.meta.dir, "../../src/index.ts");
   const spawnEnv = { ...process.env, CONSOLA_LEVEL: "5" };
   let tmpDirs: string[] = [];
 
@@ -61,9 +61,9 @@ describe("3-way merge", () => {
     await writeFile(theirsPath, theirs);
 
     const proc = Bun.spawn(
-      ["bun", "run", CLI, "merge", basePath, oursPath, theirsPath],
+      [process.execPath, "run", CLI, "merge", basePath, oursPath, theirsPath],
       {
-        cwd: "/Users/hakko/Sources/cf-envsync",
+        cwd: join(import.meta.dir, "../.."),
         stdout: "pipe",
         stderr: "pipe",
         env: spawnEnv,

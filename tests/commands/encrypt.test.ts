@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+const CLI = join(import.meta.dir, "../../src/index.ts");
 
 function createTmpProject(): string {
   const tmpDir = mkdtempSync(join(tmpdir(), "envsync-encrypt-test-"));
@@ -30,7 +30,7 @@ function createTmpProject(): string {
 }
 
 async function runEncrypt(cwd: string, ...args: string[]): Promise<{ output: string; exitCode: number }> {
-  const proc = Bun.spawn(["bun", "run", CLI, "encrypt", ...args], {
+  const proc = Bun.spawn([process.execPath, "run", CLI, "encrypt", ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",

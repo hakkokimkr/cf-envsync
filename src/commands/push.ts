@@ -77,7 +77,23 @@ export default defineCommand({
       return;
     }
 
+    // Show a summary when --force is used, especially for production
+    if (args.force && !args["dry-run"]) {
+      const targets = apps
+        .map((app) => {
+          const w = getWorkerName(app, environment);
+          return w ? `${app.name} → ${w}` : null;
+        })
+        .filter(Boolean);
+      if (targets.length > 0) {
+        consola.warn(
+          `Force-pushing to ${environment}: ${targets.join(", ")}`,
+        );
+      }
+    }
+
     const sharedKeys = new Set(config.raw.shared ?? []);
+    let hasFailure = false;
 
     for (const app of apps) {
       const workerName = getWorkerName(app, environment);
@@ -148,9 +164,14 @@ export default defineCommand({
         consola.success(`  Pushed ${keyCount} secrets to ${workerName}`);
       } else {
         consola.error(`  Failed to push secrets to ${workerName}`);
+        hasFailure = true;
       }
     }
 
+    if (hasFailure) {
+      consola.error("Some pushes failed.");
+      process.exit(1);
+    }
     consola.success("Done!");
   },
 });

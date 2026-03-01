@@ -1,11 +1,12 @@
 import { describe, test, expect } from "bun:test";
+import { join } from "node:path";
 
-const FIXTURE = "/Users/hakko/Sources/cf-envsync/tests/fixtures/sample-project";
-const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+const FIXTURE = join(import.meta.dir, "../fixtures/sample-project");
+const CLI = join(import.meta.dir, "../../src/index.ts");
 const spawnEnv = { ...process.env, CONSOLA_LEVEL: "5" };
 
 async function runList(...args: string[]): Promise<{ output: string; exitCode: number }> {
-  const proc = Bun.spawn(["bun", "run", CLI, "list", ...args], {
+  const proc = Bun.spawn([process.execPath, "run", CLI, "list", ...args], {
     cwd: FIXTURE,
     stdout: "pipe",
     stderr: "pipe",
