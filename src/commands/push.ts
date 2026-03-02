@@ -48,7 +48,7 @@ export default defineCommand({
     if (!args["dry-run"]) {
       const hasWrangler = await checkWrangler();
       if (!hasWrangler) {
-        consola.error("wrangler CLI not found. Install it with: npm i -g wrangler");
+        consola.error("wrangler CLI not found. Install it with: npm i -D wrangler");
         process.exit(1);
       }
     }

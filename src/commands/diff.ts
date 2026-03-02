@@ -127,7 +127,7 @@ export default defineCommand({
       // --- Local-vs-Remote mode ---
       const hasWrangler = await checkWrangler();
       if (!hasWrangler) {
-        consola.error("wrangler CLI not found. Install it with: npm i -g wrangler");
+        consola.error("wrangler CLI not found. Install it with: npm i -D wrangler");
         process.exit(1);
       }
 

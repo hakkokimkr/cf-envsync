@@ -32,7 +32,7 @@ describe("checkWrangler", () => {
       success: true,
     });
     expect(await checkWrangler()).toBe(true);
-    expect(mockExecFn).toHaveBeenCalledWith(["wrangler", "--version"]);
+    expect(mockExecFn).toHaveBeenCalledWith(["npx", "wrangler", "--version"]);
   });
 
   test("returns false on failure", async () => {

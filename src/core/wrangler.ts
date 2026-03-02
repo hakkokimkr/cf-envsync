@@ -6,7 +6,7 @@ import type { EnvMap } from "../types/env.ts";
  * Check if wrangler CLI is available.
  */
 export async function checkWrangler(): Promise<boolean> {
-  const result = await exec(["wrangler", "--version"]);
+  const result = await exec(["npx", "wrangler", "--version"]);
   return result.success;
 }
 
@@ -33,6 +33,7 @@ export async function pushSecrets(
 ): Promise<{ success: boolean; output: string }> {
   const json = JSON.stringify(secrets);
   const args = [
+    "npx",
     "wrangler",
     "secret",
     "bulk",
@@ -64,6 +65,7 @@ export async function listSecrets(
   cwd?: string,
 ): Promise<string[]> {
   const args = [
+    "npx",
     "wrangler",
     "secret",
     "list",
@@ -103,6 +105,7 @@ export async function deleteSecret(
   cwd?: string,
 ): Promise<boolean> {
   const args = [
+    "npx",
     "wrangler",
     "secret",
     "delete",

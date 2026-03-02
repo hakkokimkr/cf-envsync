@@ -28,11 +28,13 @@ describe("pull command", () => {
   test("fails gracefully when wrangler not available", async () => {
     const dir = await setupTmpProject();
 
+    // Use a minimal PATH that excludes npx/wrangler so the check fails
+    const bunPath = process.execPath.split("/").slice(0, -1).join("/");
     const proc = Bun.spawn([process.execPath, "run", CLI, "pull", "staging"], {
       cwd: dir,
       stdout: "pipe",
       stderr: "pipe",
-      env: spawnEnv,
+      env: { ...spawnEnv, PATH: bunPath },
     });
     const [stdout, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),
@@ -41,7 +43,7 @@ describe("pull command", () => {
     ]);
     const output = stdout + stderr;
 
-    // Without wrangler installed, pull should fail with wrangler error
+    // Without wrangler/npx available, pull should fail with wrangler error
     expect(output).toContain("wrangler");
   });
 });

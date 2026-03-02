@@ -73,16 +73,16 @@ pnpm add -D cf-envsync
 
 ```bash
 # Initialize (scans wrangler.jsonc files in monorepos)
-envsync init --monorepo
+npx envsync init --monorepo
 
 # Generate .dev.vars for local development
-envsync dev
+npx envsync dev
 
 # Push secrets to staging
-envsync push staging
+npx envsync push staging
 
 # Validate nothing is missing before deploying
-envsync validate
+npx envsync validate
 ```
 
 ### Requirements
@@ -102,7 +102,7 @@ A complete walkthrough: project setup → local dev → deploy to staging → va
 ```bash
 # In your monorepo root
 npm install -D cf-envsync
-envsync init --monorepo
+npx envsync init --monorepo
 ```
 
 This scans for `wrangler.jsonc` files, discovers your workers, and generates:
@@ -143,8 +143,8 @@ DEV_TUNNEL_URL=https://my-tunnel.ngrok.io
 echo "ENVSYNC_PASSWORD=my-team-password" > .env.password
 
 # Encrypt all plain values
-envsync encrypt staging
-envsync encrypt production
+npx envsync encrypt staging
+npx envsync encrypt production
 
 # Now .env.staging looks like:
 # DATABASE_URL=envsync:v1:base64payload...
@@ -154,7 +154,7 @@ envsync encrypt production
 ### 4. Local development
 
 ```bash
-envsync dev
+npx envsync dev
 ```
 
 This reads `.env` + `.env.local`, merges them, and writes `.dev.vars` into each app directory. Start wrangler as usual — it reads `.dev.vars` automatically.
@@ -188,10 +188,10 @@ If you forgot to set a per-dev override, envsync tells you:
 
 ```bash
 # Preview first
-envsync push staging --dry-run
+npx envsync push staging --dry-run
 
 # Push for real
-envsync push staging
+npx envsync push staging
 #   Push 4 secrets to worker "my-api-staging" (staging)? yes
 #   ✓ Pushed 4 secrets to my-api-staging
 #   Push 1 secrets to worker "my-web-staging" (staging)? yes
@@ -201,7 +201,7 @@ envsync push staging
 ### 6. Validate before deploying
 
 ```bash
-envsync validate
+npx envsync validate
 # Checks every app × every environment against .env.example
 # Exit code 1 if anything is missing → safe for CI
 ```
@@ -211,10 +211,10 @@ envsync validate
 ```yaml
 # GitHub Actions example
 - name: Validate env vars
-  run: envsync validate
+  run: npx envsync validate
 
 - name: Push secrets to production
-  run: envsync push production --force
+  run: npx envsync push production --force
   env:
     ENVSYNC_PASSWORD: ${{ secrets.ENVSYNC_PASSWORD }}
     CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
@@ -229,10 +229,10 @@ envsync validate
 The command you'll use most. Merges `.env` + `.env.local` and writes `.dev.vars` for each app.
 
 ```bash
-envsync dev                    # All apps
-envsync dev api                # Just api
-envsync dev api web            # Multiple apps
-envsync dev --env staging      # Use staging values for local dev
+npx envsync dev                    # All apps
+npx envsync dev api                # Just api
+npx envsync dev api web            # Multiple apps
+npx envsync dev --env staging      # Use staging values for local dev
 ```
 
 ```
@@ -268,10 +268,10 @@ Every key shows exactly where its value came from. Missing per-dev overrides are
 Push secrets to Cloudflare Workers via `wrangler secret bulk`. One command, all workers.
 
 ```bash
-envsync push staging                # All apps → staging workers
-envsync push production             # All apps → production workers
-envsync push staging api            # Just api's staging worker
-envsync push production --shared    # Only shared secrets (JWT_SECRET, etc.)
+npx envsync push staging                # All apps → staging workers
+npx envsync push production             # All apps → production workers
+npx envsync push staging api            # Just api's staging worker
+npx envsync push production --shared    # Only shared secrets (JWT_SECRET, etc.)
 ```
 
 ```
@@ -301,11 +301,11 @@ Two modes: **local vs remote** and **env vs env**.
 
 ```bash
 # Local .env.production vs what's actually on Cloudflare
-envsync diff production
-envsync diff production api
+npx envsync diff production
+npx envsync diff production api
 
 # Compare two environments side-by-side
-envsync diff staging production
+npx envsync diff staging production
 ```
 
 ```
@@ -328,9 +328,9 @@ Catch missing keys before they break production.
 Checks all apps across all environments against `.env.example`.
 
 ```bash
-envsync validate               # All environments, all apps
-envsync validate staging       # Just staging
-envsync validate staging api   # Just api in staging
+npx envsync validate               # All environments, all apps
+npx envsync validate staging       # Just staging
+npx envsync validate staging api   # Just api in staging
 ```
 
 ```
@@ -366,8 +366,8 @@ Exits with code 1 on failure — plug it into CI.
 Pull secret key names from Cloudflare and scaffold empty entries in your local `.env` file. (Values are not available via the API — only key names.)
 
 ```bash
-envsync pull staging
-envsync pull production api
+npx envsync pull staging
+npx envsync pull production api
 ```
 
 ---
@@ -375,8 +375,8 @@ envsync pull production api
 ### `envsync list` — See the full picture
 
 ```bash
-envsync list               # Summary table
-envsync list api --keys    # Detailed key list for one app
+npx envsync list               # Summary table
+npx envsync list api --keys    # Detailed key list for one app
 ```
 
 ```
@@ -410,8 +410,8 @@ $ envsync list
 Interactive setup that scans your repo and generates everything.
 
 ```bash
-envsync init               # Single project
-envsync init --monorepo    # Scans for wrangler.jsonc files
+npx envsync init               # Single project
+npx envsync init --monorepo    # Scans for wrangler.jsonc files
 ```
 
 What it does:
@@ -429,8 +429,8 @@ What it does:
 Alphabetically sorts keys in all `.env*` files. Reduces diff noise, prevents merge conflicts.
 
 ```bash
-envsync normalize              # All .env* files recursively
-envsync normalize .env.staging # Specific file
+npx envsync normalize              # All .env* files recursively
+npx envsync normalize .env.staging # Specific file
 ```
 
 ---
@@ -440,9 +440,9 @@ envsync normalize .env.staging # Specific file
 Encrypts plain-text values in a `.env` file using password-based encryption (AES-256-GCM). Only available when `encryption: "password"`.
 
 ```bash
-envsync encrypt staging           # Encrypt all plain values in .env.staging
-envsync encrypt production        # Encrypt .env.production
-envsync encrypt staging --dry-run # Preview without writing
+npx envsync encrypt staging           # Encrypt all plain values in .env.staging
+npx envsync encrypt production        # Encrypt .env.production
+npx envsync encrypt staging --dry-run # Preview without writing
 ```
 
 ```
@@ -637,8 +637,8 @@ ENVSYNC_PASSWORD_PRODUCTION=production-password
 EOF
 
 # Encrypt plain values
-envsync encrypt staging
-envsync encrypt production
+npx envsync encrypt staging
+npx envsync encrypt production
 ```
 
 ### File structure
