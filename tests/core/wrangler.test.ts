@@ -1,4 +1,7 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { ExecResult } from "../../src/utils/process.ts";
 
 // Instead of mock.module (which leaks across test files), we import the real
@@ -14,7 +17,7 @@ mock.module("../../src/utils/process.ts", () => ({
 }));
 
 // Dynamic import after mock is registered
-const { checkWrangler, pushSecrets, listSecrets, deleteSecret } = await import(
+const { checkWrangler, pushSecrets, listSecrets, deleteSecret, updateWranglerVars } = await import(
   "../../src/core/wrangler.ts"
 );
 
@@ -177,5 +180,104 @@ describe("deleteSecret", () => {
     expect(args).toContain("my-worker");
     expect(args).toContain("--force");
     expect(args).not.toContain("--env");
+  });
+});
+
+describe("updateWranglerVars", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "envsync-wrangler-vars-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("preserves comments in wrangler.jsonc", async () => {
+    const original = `{
+  // Worker name
+  "name": "my-api",
+  "account_id": "abc123",
+  "env": {
+    // Staging environment
+    "staging": {
+      "name": "my-api-staging",
+      "vars": {
+        // Existing var
+        "EXISTING": "keep-me"
+      }
+    }
+  }
+}
+`;
+    writeFileSync(join(tmpDir, "wrangler.jsonc"), original);
+
+    const result = await updateWranglerVars(tmpDir, "staging", { API_URL: "https://staging.example.com" });
+    expect(result.success).toBe(true);
+
+    const content = readFileSync(join(tmpDir, "wrangler.jsonc"), "utf-8");
+    // Comments preserved
+    expect(content).toContain("// Worker name");
+    expect(content).toContain("// Staging environment");
+    // Existing values preserved
+    expect(content).toContain("my-api");
+    expect(content).toContain("abc123");
+    // New var added
+    expect(content).toContain("API_URL");
+    expect(content).toContain("https://staging.example.com");
+  });
+
+  test("writes to env.{environment}.vars", async () => {
+    writeFileSync(join(tmpDir, "wrangler.jsonc"), `{
+  "name": "my-api",
+  "env": {
+    "staging": {
+      "name": "my-api-staging"
+    }
+  }
+}
+`);
+
+    await updateWranglerVars(tmpDir, "staging", { ENVIRONMENT: "staging" });
+    const content = readFileSync(join(tmpDir, "wrangler.jsonc"), "utf-8");
+    const parsed = JSON.parse(content.replace(/\/\/.*/g, ""));
+    expect(parsed.env.staging.vars.ENVIRONMENT).toBe("staging");
+  });
+
+  test("creates env section if missing", async () => {
+    writeFileSync(join(tmpDir, "wrangler.json"), `{
+  "name": "my-api"
+}
+`);
+
+    await updateWranglerVars(tmpDir, "production", { API_URL: "https://api.example.com" });
+    const content = readFileSync(join(tmpDir, "wrangler.json"), "utf-8");
+    const parsed = JSON.parse(content);
+    expect(parsed.env.production.vars.API_URL).toBe("https://api.example.com");
+  });
+
+  test("merges with existing vars", async () => {
+    writeFileSync(join(tmpDir, "wrangler.jsonc"), `{
+  "env": {
+    "staging": {
+      "vars": {
+        "MANUAL_VAR": "keep"
+      }
+    }
+  }
+}
+`);
+
+    await updateWranglerVars(tmpDir, "staging", { NEW_VAR: "added" });
+    const content = readFileSync(join(tmpDir, "wrangler.jsonc"), "utf-8");
+    const parsed = JSON.parse(content.replace(/\/\/.*/g, ""));
+    expect(parsed.env.staging.vars.MANUAL_VAR).toBe("keep");
+    expect(parsed.env.staging.vars.NEW_VAR).toBe("added");
+  });
+
+  test("returns failure when no wrangler config found", async () => {
+    const result = await updateWranglerVars(tmpDir, "staging", { A: "1" });
+    expect(result.success).toBe(false);
   });
 });

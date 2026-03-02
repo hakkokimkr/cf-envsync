@@ -33,8 +33,7 @@
     "@dotenvx/dotenvx": "^1.52.0",
     "citty": "^0.2.1",
     "consola": "^3.4.2",
-    "jiti": "^2.4.2",
-    "jsonc-parser": "^3.3.1"
+    "jiti": "^2.4.2"
   },
   "devDependencies": {
     "@types/node": "^22"
