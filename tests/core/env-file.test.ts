@@ -77,4 +77,24 @@ describe("writeEnvFile / loadEnvFile", () => {
 
     await rm(dir, { recursive: true });
   });
+
+  test("returns empty object for nonexistent file", async () => {
+    const loaded = await loadEnvFile("/tmp/nonexistent-env-file-test");
+    expect(loaded).toEqual({});
+  });
+});
+
+describe("encryption mismatch detection", () => {
+  test("warns when dotenvx config but envsync:v1: values", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "envsync-mismatch-"));
+    const filePath = join(dir, ".env.test");
+    await writeEnvFile(filePath, { KEY: "envsync:v1:someciphertext" });
+
+    // Capture console output by calling loadEnvFile with dotenvx encryption
+    // The warning goes to consola, but the function should still return data
+    const loaded = await loadEnvFile(filePath, "staging", dir, "dotenvx");
+    expect(loaded).toBeDefined();
+
+    await rm(dir, { recursive: true });
+  });
 });

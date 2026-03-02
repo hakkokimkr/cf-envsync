@@ -123,9 +123,17 @@ describe("resolveApps", () => {
     expect(apps[0]!.name).toBe("api");
   });
 
-  test("skips unknown app names", () => {
-    const apps = resolveApps(resolved, ["unknown"]);
-    expect(apps.length).toBe(0);
+  test("exits with error for unknown app names", () => {
+    const originalExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => { exitCode = code; throw new Error("process.exit"); }) as never;
+    try {
+      resolveApps(resolved, ["unknown"]);
+    } catch {
+      // expected
+    }
+    process.exit = originalExit;
+    expect(exitCode).toBe(1);
   });
 });
 

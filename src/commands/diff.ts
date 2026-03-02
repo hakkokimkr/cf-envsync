@@ -48,9 +48,22 @@ export default defineCommand({
 
     // Determine mode: env-vs-env or local-vs-remote
     const target = args.target as string | undefined;
-    const isEnvVsEnv = target && config.environments.includes(target);
+    const isEnv = target && config.environments.includes(target);
+    const isApp = target && target in config.apps;
 
-    if (isEnvVsEnv) {
+    // Detect ambiguity: target matches both an environment name and an app name
+    if (isEnv && isApp) {
+      consola.error(
+        `"${target}" is both an environment and an app name. This is ambiguous.`,
+      );
+      consola.info(
+        `  To compare environments: envsync diff ${env1} ${target} --\n` +
+        `  To diff local vs remote: envsync diff ${env1} -- ${target}`,
+      );
+      process.exit(1);
+    }
+
+    if (isEnv) {
       // --- Env-vs-Env mode ---
       const env2 = target;
       const appNames = parseAppNames(args as unknown as { _?: string[] }, 2);

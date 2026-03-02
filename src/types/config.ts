@@ -41,6 +41,9 @@ export interface AppConfig {
   secrets?: string[];
   /** Var keys for this app (non-secret env vars) */
   vars?: string[];
+  /** Output file(s) for `envsync dev`. Defaults to ".dev.vars".
+   *  Use an array to generate multiple files, e.g. [".dev.vars", ".env.local"] */
+  devFile?: string | string[];
 }
 
 /** Resolved config after defaults and path resolution */
@@ -62,4 +65,6 @@ export interface ResolvedAppConfig extends AppConfig {
   absolutePath: string;
   /** All keys this app needs (secrets + vars + local overrides) */
   allKeys: string[];
+  /** Normalized output file names for `envsync dev` (always an array) */
+  devFiles: string[];
 }

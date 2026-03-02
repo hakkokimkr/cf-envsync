@@ -4,7 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { readFile, writeFile } from "../../src/utils/fs.ts";
 
-const CLI = "/Users/hakko/Sources/cf-envsync/src/index.ts";
+const PROJECT_ROOT = join(import.meta.dir, "../..");
+const CLI = join(PROJECT_ROOT, "src/index.ts");
 const spawnEnv = { ...process.env, CONSOLA_LEVEL: "5" };
 
 let tmpDirs: string[] = [];
@@ -22,8 +23,8 @@ describe("normalize command", () => {
     const envPath = join(tmpDir, ".env");
     await writeFile(envPath, "ZEBRA=z\nAPPLE=a\nMango=m\n");
 
-    const proc = Bun.spawn(["bun", "run", CLI, "normalize", envPath], {
-      cwd: "/Users/hakko/Sources/cf-envsync",
+    const proc = Bun.spawn([process.execPath, "run", CLI, "normalize", envPath], {
+      cwd: PROJECT_ROOT,
       stdout: "pipe",
       stderr: "pipe",
       env: spawnEnv,
@@ -46,8 +47,8 @@ describe("normalize command", () => {
     const envPath = join(tmpDir, ".env");
     await writeFile(envPath, "# Header comment\n\nZEBRA=z\nAPPLE=a\n");
 
-    const proc = Bun.spawn(["bun", "run", CLI, "normalize", envPath], {
-      cwd: "/Users/hakko/Sources/cf-envsync",
+    const proc = Bun.spawn([process.execPath, "run", CLI, "normalize", envPath], {
+      cwd: PROJECT_ROOT,
       stdout: "pipe",
       stderr: "pipe",
       env: spawnEnv,
@@ -74,8 +75,8 @@ describe("normalize command", () => {
     const original = "ZEBRA=z\nAPPLE=a\n";
     await writeFile(envPath, original);
 
-    const proc = Bun.spawn(["bun", "run", CLI, "normalize", envPath, "--dry-run"], {
-      cwd: "/Users/hakko/Sources/cf-envsync",
+    const proc = Bun.spawn([process.execPath, "run", CLI, "normalize", envPath, "--dry-run"], {
+      cwd: PROJECT_ROOT,
       stdout: "pipe",
       stderr: "pipe",
       env: spawnEnv,

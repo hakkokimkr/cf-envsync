@@ -123,11 +123,17 @@ export function resolveConfig(
       }
     }
 
+    // Normalize devFile to string[]
+    const devFiles = app.devFile
+      ? Array.isArray(app.devFile) ? app.devFile : [app.devFile]
+      : [".dev.vars"];
+
     apps[name] = {
       ...app,
       name,
       absolutePath: resolve(projectRoot, app.path),
       allKeys,
+      devFiles,
     };
   }
 
@@ -141,6 +147,7 @@ export function resolveConfig(
 
 /**
  * Filter apps by name. If no names given, return all.
+ * Unknown app names are reported as errors and cause exit(1).
  */
 export function resolveApps(
   config: ResolvedConfig,
@@ -150,15 +157,25 @@ export function resolveApps(
     return Object.values(config.apps);
   }
 
+  const available = Object.keys(config.apps);
   const resolved: ResolvedAppConfig[] = [];
+  const unknown: string[] = [];
   for (const name of appNames) {
     const app = config.apps[name];
     if (!app) {
-      consola.warn(`Unknown app: "${name}". Skipping.`);
+      unknown.push(name);
       continue;
     }
     resolved.push(app);
   }
+
+  if (unknown.length > 0) {
+    for (const name of unknown) {
+      consola.error(`Unknown app: "${name}". Available: ${available.join(", ")}`);
+    }
+    process.exit(1);
+  }
+
   return resolved;
 }
 

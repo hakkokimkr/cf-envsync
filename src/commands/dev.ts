@@ -76,26 +76,23 @@ export default defineCommand({
 
     for (const app of apps) {
       const resolved = await resolveAppEnv(config, app, environment);
-      const devVarsPath = join(app.absolutePath, ".dev.vars");
-      const relDevVars = relative(config.projectRoot, devVarsPath);
 
       if (Object.keys(resolved.map).length === 0) {
         consola.warn(`  No env vars resolved for ${app.name}. Skipping.`);
         continue;
       }
 
-      if (args["dry-run"]) {
-        consola.log(`\n  ${relDevVars}`);
-        for (let i = 0; i < resolved.entries.length; i++) {
-          const entry = resolved.entries[i]!;
-          const isLast = i === resolved.entries.length - 1;
-          const prefix = isLast ? "\u2514" : "\u251C";
-          const src = formatSource(entry.source, entry.key, config.projectRoot, sharedKeys, localOverrideKeys);
-          consola.log(`  ${prefix} ${entry.key.padEnd(24)} \u2190 ${src}`);
+      for (const devFileName of app.devFiles) {
+        const devFilePath = join(app.absolutePath, devFileName);
+        const relDevFile = relative(config.projectRoot, devFilePath);
+
+        if (args["dry-run"]) {
+          consola.log(`\n  ${relDevFile}`);
+        } else {
+          await writeEnvFile(devFilePath, resolved.map);
+          consola.log(`\n  ${relDevFile}`);
         }
-      } else {
-        await writeEnvFile(devVarsPath, resolved.map);
-        consola.log(`\n  ${relDevVars}`);
+
         for (let i = 0; i < resolved.entries.length; i++) {
           const entry = resolved.entries[i]!;
           const isLast = i === resolved.entries.length - 1;
@@ -114,6 +111,14 @@ export default defineCommand({
             consola.log(`  \u2192 echo "${key}=<your-value>" >> ${relative(config.projectRoot, localOverridePath)}`);
           }
         }
+      }
+    }
+
+    if (environment !== "local") {
+      const hasOverrides = (config.raw.local?.overrides?.length ?? 0) > 0 ||
+        Object.keys(config.raw.local?.perApp ?? {}).length > 0;
+      if (hasOverrides) {
+        consola.info(`Per-dev overrides are only applied in "local" environment (current: ${environment}).`);
       }
     }
 
