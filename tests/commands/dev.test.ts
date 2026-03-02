@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "bun:test";
 import { join } from "node:path";
-import { mkdtemp, rm, mkdir, copyFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, copyFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileExists } from "../../src/utils/fs.ts";
 import { loadEnvFile } from "../../src/core/env-file.ts";
@@ -94,6 +94,68 @@ describe("dev command", () => {
     expect(fileExists(join(dir, "apps", "api", ".dev.vars"))).toBe(true);
     expect(fileExists(join(dir, "apps", "web", ".dev.vars"))).toBe(false);
     expect(fileExists(join(dir, "apps", "stream-collector", ".dev.vars"))).toBe(false);
+  });
+
+  test("devFile: string generates custom output file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "envsync-devfile-"));
+    tmpDirs.push(dir);
+    const config = {
+      environments: ["local", "staging"],
+      envFiles: { pattern: ".env.{env}", local: ".env.local", perApp: false },
+      encryption: "none",
+      apps: {
+        web: {
+          path: ".",
+          workers: { staging: "web-staging" },
+          vars: ["VITE_API_URL"],
+          devFile: ".env.development",
+        },
+      },
+    };
+    await writeFile(join(dir, "envsync.json"), JSON.stringify(config));
+    await writeFile(join(dir, ".env"), "VITE_API_URL=http://localhost:3000\n");
+
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev"], {
+      cwd: dir, stdout: "pipe", stderr: "pipe", env: spawnEnv,
+    });
+    await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+
+    expect(fileExists(join(dir, ".env.development"))).toBe(true);
+    expect(fileExists(join(dir, ".dev.vars"))).toBe(false);
+    const env = await loadEnvFile(join(dir, ".env.development"));
+    expect(env.VITE_API_URL).toBe("http://localhost:3000");
+  });
+
+  test("devFile: array generates multiple output files", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "envsync-devfile-multi-"));
+    tmpDirs.push(dir);
+    const config = {
+      environments: ["local", "staging"],
+      envFiles: { pattern: ".env.{env}", local: ".env.local", perApp: false },
+      encryption: "none",
+      apps: {
+        web: {
+          path: ".",
+          workers: { staging: "web-staging" },
+          vars: ["VITE_API_URL"],
+          devFile: [".dev.vars", ".env.development"],
+        },
+      },
+    };
+    await writeFile(join(dir, "envsync.json"), JSON.stringify(config));
+    await writeFile(join(dir, ".env"), "VITE_API_URL=http://localhost:3000\n");
+
+    const proc = Bun.spawn([process.execPath, "run", CLI, "dev"], {
+      cwd: dir, stdout: "pipe", stderr: "pipe", env: spawnEnv,
+    });
+    await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+
+    expect(fileExists(join(dir, ".dev.vars"))).toBe(true);
+    expect(fileExists(join(dir, ".env.development"))).toBe(true);
+    const env1 = await loadEnvFile(join(dir, ".dev.vars"));
+    const env2 = await loadEnvFile(join(dir, ".env.development"));
+    expect(env1.VITE_API_URL).toBe("http://localhost:3000");
+    expect(env2.VITE_API_URL).toBe("http://localhost:3000");
   });
 
   test("shows per-dev override info when using non-local env", async () => {

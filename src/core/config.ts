@@ -123,11 +123,17 @@ export function resolveConfig(
       }
     }
 
+    // Normalize devFile to string[]
+    const devFiles = app.devFile
+      ? Array.isArray(app.devFile) ? app.devFile : [app.devFile]
+      : [".dev.vars"];
+
     apps[name] = {
       ...app,
       name,
       absolutePath: resolve(projectRoot, app.path),
       allKeys,
+      devFiles,
     };
   }
 

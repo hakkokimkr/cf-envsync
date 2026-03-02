@@ -164,15 +164,18 @@ apps/api/.dev.vars      ← DATABASE_URL, JWT_SECRET, API_URL, OAUTH_REDIRECT_UR
 apps/web/.dev.vars      ← AUTH_SECRET, VITE_API_URL, VITE_OAUTH_REDIRECT_URL
 ```
 
-> **Note: `.dev.vars` is for wrangler only.** If your app runs with `vite dev` instead of `wrangler dev`, Vite reads `.env` files directly — not `.dev.vars`. In that case, you have two options:
+> **Vite / non-wrangler apps:** `.dev.vars` is for wrangler only. If your app runs with `vite dev`, set `devFile` in your config:
 >
-> 1. **Run your Vite app with wrangler** — `wrangler pages dev` or `wrangler dev` reads `.dev.vars` and passes them to your app (recommended for Cloudflare Pages projects).
-> 2. **Symlink or copy** — Point your Vite app's `.env.local` to the generated `.dev.vars`:
->    ```bash
->    # in apps/web/
->    ln -sf .dev.vars .env.local
->    ```
->    Or add a script: `"dev": "envsync dev web && vite"`
+> ```ts
+> apps: {
+>   web: {
+>     path: "apps/web",
+>     devFile: ".env.local",          // Vite reads this
+>     // or generate both:
+>     // devFile: [".dev.vars", ".env.local"],
+>   },
+> }
+> ```
 
 If you forgot to set a per-dev override, envsync tells you:
 
@@ -256,7 +259,7 @@ Done!
 
 Every key shows exactly where its value came from. Missing per-dev overrides are caught immediately.
 
-> **Vite / non-wrangler apps:** `.dev.vars` is a wrangler-specific file. If your app uses `vite dev` directly, see the [note in the tutorial](#4-local-development) for how to integrate.
+> **Vite / non-wrangler apps:** Set `devFile: ".env.local"` in your app config. See [the tutorial](#4-local-development).
 
 ---
 
@@ -587,6 +590,7 @@ export default {
 | `apps.{name}.workers` | `Record<string, string>` | Worker name per environment |
 | `apps.{name}.secrets` | `string[]` | Secret keys pushed via `wrangler secret bulk` |
 | `apps.{name}.vars` | `string[]` | Non-secret env vars (not pushed as secrets) |
+| `apps.{name}.devFile` | `string \| string[]` | Output file(s) for `envsync dev`. Default: `".dev.vars"`. Use `".env.local"` for Vite apps, or an array for both |
 | `shared` | `string[]` | Keys with the same value across multiple apps |
 | `local.overrides` | `string[]` | Keys each developer must set in `.env.local` |
 | `local.perApp` | `Record<string, string[]>` | Per-app developer override keys |
