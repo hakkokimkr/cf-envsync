@@ -164,6 +164,16 @@ apps/api/.dev.vars      ← DATABASE_URL, JWT_SECRET, API_URL, OAUTH_REDIRECT_UR
 apps/web/.dev.vars      ← AUTH_SECRET, VITE_API_URL, VITE_OAUTH_REDIRECT_URL
 ```
 
+> **Note: `.dev.vars` is for wrangler only.** If your app runs with `vite dev` instead of `wrangler dev`, Vite reads `.env` files directly — not `.dev.vars`. In that case, you have two options:
+>
+> 1. **Run your Vite app with wrangler** — `wrangler pages dev` or `wrangler dev` reads `.dev.vars` and passes them to your app (recommended for Cloudflare Pages projects).
+> 2. **Symlink or copy** — Point your Vite app's `.env.local` to the generated `.dev.vars`:
+>    ```bash
+>    # in apps/web/
+>    ln -sf .dev.vars .env.local
+>    ```
+>    Or add a script: `"dev": "envsync dev web && vite"`
+
 If you forgot to set a per-dev override, envsync tells you:
 
 ```
@@ -245,6 +255,8 @@ Done!
 ```
 
 Every key shows exactly where its value came from. Missing per-dev overrides are caught immediately.
+
+> **Vite / non-wrangler apps:** `.dev.vars` is a wrangler-specific file. If your app uses `vite dev` directly, see the [note in the tutorial](#4-local-development) for how to integrate.
 
 ---
 
