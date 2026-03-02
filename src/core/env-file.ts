@@ -63,8 +63,17 @@ export async function loadEnvFile(
 
   if (encryption === "password") {
     const envMap = parsePlainEnv(content);
+    const hasEncryptedValues = Object.values(envMap).some((v) => v.startsWith("envsync:v1:"));
     const password = findPassword(env, projectRoot);
-    if (!password) return envMap;
+    if (!password) {
+      if (hasEncryptedValues) {
+        throw new Error(
+          `${filePath} contains encrypted values but no password found. ` +
+          `Set ENVSYNC_PASSWORD${env ? `_${env.toUpperCase()}` : ""} or create .env.password`,
+        );
+      }
+      return envMap;
+    }
     return decryptEnvMap(envMap, password);
   }
 
