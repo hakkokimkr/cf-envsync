@@ -22,8 +22,11 @@ async function setupFixture() {
   // Root .env.staging
   await _writeFile(join(tmpDir, ".env.staging"), "DB=staging_db\nSHARED=staging\nAPI_URL=https://staging.example.com\n");
 
-  // App .env (local)
+  // App .env (local) — should NOT be read by envsync (conflicts with framework .env)
   await _writeFile(join(tmpDir, "apps", "api", ".env"), "DB=app_local_db\n");
+
+  // App .env.local (per-app local overrides)
+  await _writeFile(join(tmpDir, "apps", "api", ".env.local"), "DB=app_local_override\n");
 
   // App .env.staging
   await _writeFile(join(tmpDir, "apps", "api", ".env.staging"), "DB=app_staging_db\n");
@@ -62,20 +65,20 @@ afterAll(async () => {
 });
 
 describe("resolveAppEnv", () => {
-  test("2-layer merge for local env (root + .env.local, no per-app)", async () => {
+  test("3-layer merge for local env (root + app .env.local + root .env.local)", async () => {
     const app = config.apps.api!;
     const resolved = await resolveAppEnv(config, app, "local");
 
-    // local env skips per-app layer (apps/api/.env conflicts with framework .env)
-    // so DB comes from root, not app
-    expect(resolved.map.DB).toBe("root_local");
+    // Per-app uses apps/api/.env.local (NOT apps/api/.env which conflicts with frameworks)
+    // so DB comes from apps/api/.env.local, overriding root
+    expect(resolved.map.DB).toBe("app_local_override");
     // root provides SHARED and API_URL
     expect(resolved.map.SHARED).toBe("root");
     expect(resolved.map.API_URL).toBe("http://localhost");
     // .env.local provides DEV_TUNNEL
     expect(resolved.map.DEV_TUNNEL).toBe("https://my-tunnel.dev");
-    // layers should include 2 sources (root + .env.local, no per-app)
-    expect(resolved.layers.length).toBe(2);
+    // layers: root .env + apps/api/.env.local + root .env.local
+    expect(resolved.layers.length).toBe(3);
   });
 
   test("2-layer merge for non-local env (root + app, no .env.local)", async () => {

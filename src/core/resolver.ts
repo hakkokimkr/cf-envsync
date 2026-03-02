@@ -1,4 +1,4 @@
-import { normalize, relative } from "node:path";
+import { join, normalize, relative } from "node:path";
 import { consola } from "consola";
 import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 import type { EnvMap, ResolvedEnv } from "../types/env.ts";
@@ -38,10 +38,13 @@ export async function resolveAppEnv(
     layers.push({ source: rootEnvPath, map: rootEnv });
   }
 
-  // Layer 2: App-specific .env.{env} (if perApp enabled, skip for local —
-  // local resolves to .env which conflicts with framework .env files in app dirs)
-  if (config.raw.envFiles.perApp && environment !== "local") {
-    const appEnvPath = getAppEnvPath(config, app, environment);
+  // Layer 2: App-specific .env.{env} (if perApp enabled)
+  // For local env, use .env.local in app dir instead of .env (which conflicts
+  // with framework .env files like Vite's)
+  if (config.raw.envFiles.perApp) {
+    const appEnvPath = environment === "local"
+      ? join(app.absolutePath, config.raw.envFiles.local)
+      : getAppEnvPath(config, app, environment);
     if (normalize(appEnvPath) !== normalize(rootEnvPath)) {
       const appEnv = await loadEnvFile(appEnvPath, environment, config.projectRoot, encryption);
       if (Object.keys(appEnv).length > 0) {
