@@ -11,19 +11,11 @@ export async function checkWrangler(): Promise<boolean> {
 }
 
 /**
- * Build wrangler --env flag. Production has no env flag.
- */
-function envFlag(environment: string): string[] {
-  if (environment === "production") return [];
-  return ["--env", environment];
-}
-
-/**
  * Push secrets to a Cloudflare Worker via `wrangler secret bulk`.
  * Pipes JSON to stdin.
  *
- * Uses `--name` to specify the worker. `--name` and `--env` can be used
- * together (e.g. `wrangler secret bulk --name my-worker --env staging`).
+ * Uses `--name` to specify the worker directly — no `--env` flag needed
+ * since the worker name already encodes the environment.
  */
 export async function pushSecrets(
   workerName: string,
@@ -39,7 +31,6 @@ export async function pushSecrets(
     "bulk",
     "--name",
     workerName,
-    ...envFlag(environment),
   ];
 
   consola.debug(`Running: ${args.join(" ")}`);
@@ -61,7 +52,7 @@ export async function pushSecrets(
  */
 export async function listSecrets(
   workerName: string,
-  environment: string,
+  _environment: string,
   cwd?: string,
 ): Promise<string[]> {
   const args = [
@@ -71,7 +62,6 @@ export async function listSecrets(
     "list",
     "--name",
     workerName,
-    ...envFlag(environment),
   ];
 
   const result = await exec(args, { cwd });
@@ -101,7 +91,7 @@ export async function listSecrets(
 export async function deleteSecret(
   workerName: string,
   key: string,
-  environment: string,
+  _environment: string,
   cwd?: string,
 ): Promise<boolean> {
   const args = [
@@ -112,7 +102,6 @@ export async function deleteSecret(
     key,
     "--name",
     workerName,
-    ...envFlag(environment),
     "--force",
   ];
 

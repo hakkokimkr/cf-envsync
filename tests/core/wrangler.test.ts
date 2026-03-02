@@ -75,7 +75,7 @@ describe("pushSecrets", () => {
     expect(opts.cwd).toBe("/my/project");
   });
 
-  test("builds correct args for staging", async () => {
+  test("builds correct args with --name only (no --env)", async () => {
     mockExecFn.mockResolvedValueOnce({
       stdout: "ok",
       stderr: "",
@@ -94,25 +94,11 @@ describe("pushSecrets", () => {
     expect(args).toContain("bulk");
     expect(args).toContain("--name");
     expect(args).toContain("my-worker");
-    expect(args).toContain("--env");
-    expect(args).toContain("staging");
+    expect(args).not.toContain("--env");
 
     const opts = call[1] as { stdin: string; cwd: string };
     expect(opts.stdin).toBe(JSON.stringify({ KEY: "val" }));
     expect(opts.cwd).toBe("/tmp");
-  });
-
-  test("production has no --env flag", async () => {
-    mockExecFn.mockResolvedValueOnce({
-      stdout: "ok",
-      stderr: "",
-      exitCode: 0,
-      success: true,
-    });
-
-    await pushSecrets("my-worker", { K: "v" }, "production");
-    const args = mockExecFn.mock.calls[0]![0] as string[];
-    expect(args).not.toContain("--env");
   });
 
   test("returns failure on error", async () => {
@@ -171,7 +157,7 @@ describe("listSecrets", () => {
 });
 
 describe("deleteSecret", () => {
-  test("builds correct args with --force", async () => {
+  test("builds correct args with --force and no --env", async () => {
     mockExecFn.mockResolvedValueOnce({
       stdout: "",
       stderr: "",
@@ -190,21 +176,6 @@ describe("deleteSecret", () => {
     expect(args).toContain("--name");
     expect(args).toContain("my-worker");
     expect(args).toContain("--force");
-    expect(args).toContain("--env");
-    expect(args).toContain("staging");
-  });
-
-  test("production has no --env flag", async () => {
-    mockExecFn.mockResolvedValueOnce({
-      stdout: "",
-      stderr: "",
-      exitCode: 0,
-      success: true,
-    });
-
-    await deleteSecret("my-worker", "MY_KEY", "production");
-    const args = mockExecFn.mock.calls[0]![0] as string[];
     expect(args).not.toContain("--env");
-    expect(args).toContain("--force");
   });
 });
