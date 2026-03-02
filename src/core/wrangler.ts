@@ -1,59 +1,9 @@
 import { join } from "node:path";
 import { consola } from "consola";
+import { parse as parseJsonc, modify, applyEdits } from "jsonc-parser";
 import { exec } from "../utils/process.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
 import type { EnvMap } from "../types/env.ts";
-
-/**
- * Strip JSONC comments (// and /* *​/) and trailing commas.
- * Respects string literals so quoted slashes aren't stripped.
- */
-function stripJsonc(text: string): string {
-  let result = "";
-  let i = 0;
-  let inString = false;
-
-  while (i < text.length) {
-    if (inString) {
-      result += text[i];
-      if (text[i] === "\\" && i + 1 < text.length) {
-        result += text[i + 1];
-        i += 2;
-        continue;
-      }
-      if (text[i] === '"') inString = false;
-      i++;
-      continue;
-    }
-
-    if (text[i] === '"') {
-      inString = true;
-      result += text[i];
-      i++;
-      continue;
-    }
-
-    // Line comment
-    if (text[i] === "/" && text[i + 1] === "/") {
-      while (i < text.length && text[i] !== "\n") i++;
-      continue;
-    }
-
-    // Block comment
-    if (text[i] === "/" && text[i + 1] === "*") {
-      i += 2;
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
-      i += 2;
-      continue;
-    }
-
-    result += text[i];
-    i++;
-  }
-
-  // Remove trailing commas before } or ]
-  return result.replace(/,(\s*[}\]])/g, "$1");
-}
 
 /**
  * Check if wrangler CLI is available.
@@ -175,6 +125,7 @@ function findWranglerConfig(appPath: string): string | undefined {
 
 /**
  * Update vars in an app's wrangler.jsonc/wrangler.json under `env.{environment}.vars`.
+ * Uses jsonc-parser to preserve comments and formatting.
  * Merges with existing vars (envsync-managed keys are added/updated,
  * manually set keys are preserved).
  */
@@ -189,21 +140,19 @@ export async function updateWranglerVars(
   }
 
   const content = await readFile(configPath);
-  const stripped = stripJsonc(content);
-  const config = JSON.parse(stripped) as Record<string, unknown>;
+  const config = parseJsonc(content) as Record<string, unknown>;
 
-  // Write to env.{environment}.vars
-  if (!config.env || typeof config.env !== "object") {
-    config.env = {};
-  }
-  const envSection = config.env as Record<string, Record<string, unknown>>;
-  if (!envSection[environment] || typeof envSection[environment] !== "object") {
-    envSection[environment] = {};
-  }
-  const existingVars = (envSection[environment].vars as Record<string, string>) || {};
-  envSection[environment].vars = { ...existingVars, ...vars };
+  // Merge with existing vars
+  const envSection = (config?.env as Record<string, Record<string, unknown>>) ?? {};
+  const existingVars = (envSection[environment]?.vars as Record<string, string>) ?? {};
+  const mergedVars = { ...existingVars, ...vars };
 
-  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
+  // Apply edit preserving comments and formatting
+  const fmt = { tabSize: 2, insertSpaces: true };
+  const edits = modify(content, ["env", environment, "vars"], mergedVars, { formattingOptions: fmt });
+  const updated = applyEdits(content, edits);
+
+  await writeFile(configPath, updated);
 
   return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
 }
