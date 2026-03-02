@@ -174,12 +174,13 @@ function findWranglerConfig(appPath: string): string | undefined {
 }
 
 /**
- * Update the `vars` section in an app's wrangler.jsonc/wrangler.json.
+ * Update vars in an app's wrangler.jsonc/wrangler.json under `env.{environment}.vars`.
  * Merges with existing vars (envsync-managed keys are added/updated,
  * manually set keys are preserved).
  */
 export async function updateWranglerVars(
   appPath: string,
+  environment: string,
   vars: EnvMap,
 ): Promise<{ success: boolean; filePath?: string; updatedCount: number }> {
   const configPath = findWranglerConfig(appPath);
@@ -191,7 +192,16 @@ export async function updateWranglerVars(
   const stripped = stripJsonc(content);
   const config = JSON.parse(stripped) as Record<string, unknown>;
 
-  config.vars = { ...((config.vars as Record<string, string>) || {}), ...vars };
+  // Write to env.{environment}.vars
+  if (!config.env || typeof config.env !== "object") {
+    config.env = {};
+  }
+  const envSection = config.env as Record<string, Record<string, unknown>>;
+  if (!envSection[environment] || typeof envSection[environment] !== "object") {
+    envSection[environment] = {};
+  }
+  const existingVars = (envSection[environment].vars as Record<string, string>) || {};
+  envSection[environment].vars = { ...existingVars, ...vars };
 
   await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
 

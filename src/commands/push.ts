@@ -208,7 +208,7 @@ export default defineCommand({
 
       // Write vars to wrangler.jsonc
       if (varsCount > 0) {
-        const varsResult = await updateWranglerVars(app.absolutePath, varsToPush);
+        const varsResult = await updateWranglerVars(app.absolutePath, environment, varsToPush);
         if (varsResult.success) {
           consola.success(`  Wrote ${varsCount} vars to ${varsResult.filePath}`);
         } else {
