@@ -107,6 +107,13 @@ describe("encryptEnvMap / decryptEnvMap", () => {
     expect(isEnvsyncEncrypted(encrypted.FILLED)).toBe(true);
   });
 
+  test("throws descriptive error with key name on wrong password", () => {
+    const encrypted = encryptEnvMap({ DATABASE_URL: "secret" }, password);
+    expect(() => decryptEnvMap(encrypted, "wrong-password")).toThrow(
+      "Failed to decrypt DATABASE_URL",
+    );
+  });
+
   test("passes through non-encrypted values during decrypt", () => {
     const map = { PLAIN: "not-encrypted", ENCRYPTED: encryptValue("secret", password) };
     const decrypted = decryptEnvMap(map, password);

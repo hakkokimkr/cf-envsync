@@ -132,7 +132,18 @@ export function decryptValue(token: string, password: string): string {
 export function decryptEnvMap(envMap: Record<string, string>, password: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(envMap)) {
-    result[key] = isEnvsyncEncrypted(value) ? decryptValue(value, password) : value;
+    if (isEnvsyncEncrypted(value)) {
+      try {
+        result[key] = decryptValue(value, password);
+      } catch {
+        throw new Error(
+          `Failed to decrypt ${key}: wrong password or corrupted data. ` +
+          `Check ENVSYNC_PASSWORD or .env.password`,
+        );
+      }
+    } else {
+      result[key] = value;
+    }
   }
   return result;
 }
