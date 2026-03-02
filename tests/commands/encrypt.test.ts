@@ -70,11 +70,14 @@ describe("encrypt command", () => {
   });
 
   test("skips already-encrypted values", async () => {
-    writeFileSync(
-      join(tmpDir, ".env.staging"),
-      "DATABASE_URL=envsync:v1:abc123\nAPI_KEY=plain-value\n",
-    );
+    // First encrypt DATABASE_URL
+    writeFileSync(join(tmpDir, ".env.staging"), "DATABASE_URL=secret-db-url\n");
     writeFileSync(join(tmpDir, ".env.password"), "ENVSYNC_PASSWORD=test-pw\n");
+    await runEncrypt(tmpDir, "staging");
+
+    // Now add a plain value alongside the already-encrypted one
+    const encrypted = readFileSync(join(tmpDir, ".env.staging"), "utf-8").trim();
+    writeFileSync(join(tmpDir, ".env.staging"), encrypted + "\nAPI_KEY=plain-value\n");
 
     const { output, exitCode } = await runEncrypt(tmpDir, "staging");
     expect(exitCode).toBe(0);
@@ -82,8 +85,8 @@ describe("encrypt command", () => {
     expect(output).not.toContain("DATABASE_URL: encrypted");
 
     const content = readFileSync(join(tmpDir, ".env.staging"), "utf-8");
-    // Already-encrypted value should remain unchanged
-    expect(content).toContain("DATABASE_URL=envsync:v1:abc123");
+    // Both should be encrypted now
+    expect(content).toContain("DATABASE_URL=envsync:v1:");
     expect(content).toContain("API_KEY=envsync:v1:");
   });
 
@@ -137,6 +140,24 @@ describe("encrypt command", () => {
     const { output, exitCode } = await runEncrypt(tmpDir, "staging");
     expect(exitCode).toBe(1);
     expect(output).toContain('encryption: "password"');
+  });
+
+  test("errors when password differs from existing encrypted values", async () => {
+    // First encrypt with password A
+    writeFileSync(join(tmpDir, ".env.staging"), "DATABASE_URL=secret\nAPI_KEY=key123\n");
+    writeFileSync(join(tmpDir, ".env.password"), "ENVSYNC_PASSWORD=password-A\n");
+    const { exitCode: firstExit } = await runEncrypt(tmpDir, "staging");
+    expect(firstExit).toBe(0);
+
+    // Now add a plain value and change password to B
+    const existing = readFileSync(join(tmpDir, ".env.staging"), "utf-8");
+    writeFileSync(join(tmpDir, ".env.staging"), existing + "NEW_KEY=new-value\n");
+    writeFileSync(join(tmpDir, ".env.password"), "ENVSYNC_PASSWORD=password-B\n");
+
+    // Should fail because existing values were encrypted with password A
+    const { output, exitCode } = await runEncrypt(tmpDir, "staging");
+    expect(exitCode).toBe(1);
+    expect(output).toContain("Password mismatch");
   });
 
   test("preserves comments and blank lines", async () => {

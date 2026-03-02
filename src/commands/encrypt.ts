@@ -3,7 +3,7 @@ import { consola } from "consola";
 import { loadConfig, validateConfig, resolveConfig } from "../core/config.ts";
 import { getRootEnvPath } from "../core/env-file.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
-import { findPassword, encryptValue, isEnvsyncEncrypted } from "../core/encryption.ts";
+import { findPassword, encryptValue, decryptValue, isEnvsyncEncrypted } from "../core/encryption.ts";
 
 /**
  * Parse plain KEY=VALUE content preserving structure.
@@ -83,6 +83,22 @@ export default defineCommand({
 
     const content = await readFile(envFilePath);
     const lines = parseLines(content);
+
+    // Verify current password against existing encrypted values
+    const firstEncrypted = lines.find(
+      (l) => l.key && l.value && isEnvsyncEncrypted(l.value.trim()),
+    );
+    if (firstEncrypted) {
+      try {
+        decryptValue(firstEncrypted.value!.trim(), password);
+      } catch {
+        consola.error(
+          `Password mismatch: cannot decrypt existing value for ${firstEncrypted.key}. ` +
+          `The current password differs from the one used to encrypt existing values.`,
+        );
+        process.exit(1);
+      }
+    }
 
     let encryptedCount = 0;
     let skippedCount = 0;
