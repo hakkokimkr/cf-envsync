@@ -93,6 +93,122 @@ envsync validate
 
 ---
 
+## 5-Minute Tutorial
+
+A complete walkthrough: project setup → local dev → deploy to staging → validate.
+
+### 1. Initialize your project
+
+```bash
+# In your monorepo root
+npm install -D cf-envsync
+envsync init --monorepo
+```
+
+This scans for `wrangler.jsonc` files, discovers your workers, and generates:
+
+```
+envsync.config.ts   ← config with all apps/workers detected
+.env.example        ← key reference (committed to git)
+.env                ← local shared secrets
+.env.staging        ← staging secrets (empty, you'll fill these)
+.env.production     ← production secrets (empty)
+.gitignore          ← updated with .env.local, .env.password, **/.dev.vars
+```
+
+### 2. Fill in your secrets
+
+```bash
+# .env — local development values (committed, encrypted)
+DATABASE_URL=postgres://localhost:5432/mydb
+JWT_SECRET=dev_jwt_secret
+AUTH_SECRET=dev_auth_secret
+API_URL=http://localhost:8787
+
+# .env.staging — staging values
+DATABASE_URL=postgres://staging-db.example.com/mydb
+JWT_SECRET=staging_jwt_secret_abc
+AUTH_SECRET=staging_auth_secret_xyz
+API_URL=https://api-staging.example.com
+
+# .env.local — YOUR dev-specific overrides (gitignored, each dev has their own)
+OAUTH_REDIRECT_URL=https://my-tunnel.ngrok.io/callback
+DEV_TUNNEL_URL=https://my-tunnel.ngrok.io
+```
+
+### 3. Encrypt before committing (optional)
+
+```bash
+# Set a password
+echo "ENVSYNC_PASSWORD=my-team-password" > .env.password
+
+# Encrypt all plain values
+envsync encrypt staging
+envsync encrypt production
+
+# Now .env.staging looks like:
+# DATABASE_URL=envsync:v1:base64payload...
+# JWT_SECRET=envsync:v1:base64payload...
+```
+
+### 4. Local development
+
+```bash
+envsync dev
+```
+
+This reads `.env` + `.env.local`, merges them, and writes `.dev.vars` into each app directory. Start wrangler as usual — it reads `.dev.vars` automatically.
+
+```
+apps/api/.dev.vars      ← DATABASE_URL, JWT_SECRET, API_URL, OAUTH_REDIRECT_URL
+apps/web/.dev.vars      ← AUTH_SECRET, VITE_API_URL, VITE_OAUTH_REDIRECT_URL
+```
+
+If you forgot to set a per-dev override, envsync tells you:
+
+```
+⚠ Missing in .env.local: DEV_TUNNEL_URL (required per-dev override)
+  → echo "DEV_TUNNEL_URL=https://your-tunnel.example.com" >> .env.local
+```
+
+### 5. Push to staging
+
+```bash
+# Preview first
+envsync push staging --dry-run
+
+# Push for real
+envsync push staging
+#   Push 4 secrets to worker "my-api-staging" (staging)? yes
+#   ✓ Pushed 4 secrets to my-api-staging
+#   Push 1 secrets to worker "my-web-staging" (staging)? yes
+#   ✓ Pushed 1 secrets to my-web-staging
+```
+
+### 6. Validate before deploying
+
+```bash
+envsync validate
+# Checks every app × every environment against .env.example
+# Exit code 1 if anything is missing → safe for CI
+```
+
+### 7. CI/CD integration
+
+```yaml
+# GitHub Actions example
+- name: Validate env vars
+  run: envsync validate
+
+- name: Push secrets to production
+  run: envsync push production --force
+  env:
+    ENVSYNC_PASSWORD: ${{ secrets.ENVSYNC_PASSWORD }}
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+```
+
+---
+
 ## Commands
 
 ### `envsync dev` — Generate `.dev.vars`
