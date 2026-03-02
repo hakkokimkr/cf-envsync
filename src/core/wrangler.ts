@@ -1,6 +1,59 @@
+import { join } from "node:path";
 import { consola } from "consola";
 import { exec } from "../utils/process.ts";
+import { fileExists, readFile, writeFile } from "../utils/fs.ts";
 import type { EnvMap } from "../types/env.ts";
+
+/**
+ * Strip JSONC comments (// and /* *​/) and trailing commas.
+ * Respects string literals so quoted slashes aren't stripped.
+ */
+function stripJsonc(text: string): string {
+  let result = "";
+  let i = 0;
+  let inString = false;
+
+  while (i < text.length) {
+    if (inString) {
+      result += text[i];
+      if (text[i] === "\\" && i + 1 < text.length) {
+        result += text[i + 1];
+        i += 2;
+        continue;
+      }
+      if (text[i] === '"') inString = false;
+      i++;
+      continue;
+    }
+
+    if (text[i] === '"') {
+      inString = true;
+      result += text[i];
+      i++;
+      continue;
+    }
+
+    // Line comment
+    if (text[i] === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i++;
+      continue;
+    }
+
+    // Block comment
+    if (text[i] === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+
+    result += text[i];
+    i++;
+  }
+
+  // Remove trailing commas before } or ]
+  return result.replace(/,(\s*[}\]])/g, "$1");
+}
 
 /**
  * Check if wrangler CLI is available.
@@ -107,4 +160,40 @@ export async function deleteSecret(
 
   const result = await exec(args, { cwd });
   return result.success;
+}
+
+/**
+ * Find the wrangler config file in an app directory.
+ */
+function findWranglerConfig(appPath: string): string | undefined {
+  for (const name of ["wrangler.jsonc", "wrangler.json"]) {
+    const p = join(appPath, name);
+    if (fileExists(p)) return p;
+  }
+  return undefined;
+}
+
+/**
+ * Update the `vars` section in an app's wrangler.jsonc/wrangler.json.
+ * Merges with existing vars (envsync-managed keys are added/updated,
+ * manually set keys are preserved).
+ */
+export async function updateWranglerVars(
+  appPath: string,
+  vars: EnvMap,
+): Promise<{ success: boolean; filePath?: string; updatedCount: number }> {
+  const configPath = findWranglerConfig(appPath);
+  if (!configPath) {
+    return { success: false, updatedCount: 0 };
+  }
+
+  const content = await readFile(configPath);
+  const stripped = stripJsonc(content);
+  const config = JSON.parse(stripped) as Record<string, unknown>;
+
+  config.vars = { ...((config.vars as Record<string, string>) || {}), ...vars };
+
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
+
+  return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
 }

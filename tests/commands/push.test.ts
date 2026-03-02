@@ -34,6 +34,15 @@ describe("push command", () => {
     expect(output).toContain("JWT_SECRET");
   });
 
+  test("dry-run shows vars that would be written to wrangler config", async () => {
+    const { output } = await runPush("staging", "--dry-run", "api");
+    // api vars: API_URL, ENVIRONMENT
+    expect(output).toContain("Would write");
+    expect(output).toContain("vars");
+    expect(output).toContain("API_URL");
+    expect(output).toContain("ENVIRONMENT");
+  });
+
   test("--shared filters to shared keys only", async () => {
     const { output } = await runPush("staging", "--dry-run", "--shared", "api");
     // shared: JWT_SECRET, TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET

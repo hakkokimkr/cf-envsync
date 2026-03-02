@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { loadConfig, validateConfig, resolveConfig, resolveApps, getWorkerName } from "../core/config.ts";
 import { resolveAppEnv } from "../core/resolver.ts";
-import { checkWrangler, pushSecrets } from "../core/wrangler.ts";
+import { checkWrangler, pushSecrets, updateWranglerVars } from "../core/wrangler.ts";
 import type { EnvMap } from "../types/env.ts";
 
 function parseAppNames(args: { _?: string[] }, skip = 1): string[] | undefined {
@@ -13,7 +13,7 @@ function parseAppNames(args: { _?: string[] }, skip = 1): string[] | undefined {
 export default defineCommand({
   meta: {
     name: "push",
-    description: "Push env vars to Cloudflare Workers secrets",
+    description: "Push secrets (wrangler) and vars (wrangler.jsonc) to Cloudflare Workers",
   },
   args: {
     env: {
@@ -113,50 +113,74 @@ export default defineCommand({
         continue;
       }
 
-      consola.start(`${progress}Pushing secrets for ${app.name} → ${workerName} (${environment})...`);
+      consola.start(`${progress}Pushing ${app.name} → ${workerName} (${environment})...`);
 
       const resolved = await resolveAppEnv(config, app, environment);
       let secretsToPush: EnvMap;
+      let varsToPush: EnvMap;
+
+      const secretKeySet = new Set(app.secrets ?? []);
+      const varsKeySet = new Set(app.vars ?? []);
 
       if (args.shared) {
-        // Only push shared secrets
+        // Only push shared keys
         secretsToPush = {};
+        varsToPush = {};
         for (const [key, value] of Object.entries(resolved.map)) {
           if (sharedKeys.has(key)) {
-            secretsToPush[key] = value;
+            if (secretKeySet.has(key)) {
+              secretsToPush[key] = value;
+            } else if (varsKeySet.has(key)) {
+              varsToPush[key] = value;
+            }
           }
         }
       } else {
-        // Push secrets only (not vars)
-        const secretKeySet = new Set(app.secrets ?? []);
+        // Push secrets via wrangler, vars to wrangler.jsonc
         secretsToPush = {};
+        varsToPush = {};
         for (const [key, value] of Object.entries(resolved.map)) {
           if (secretKeySet.has(key)) {
             secretsToPush[key] = value;
+          } else if (varsKeySet.has(key)) {
+            varsToPush[key] = value;
           }
         }
       }
 
-      const keyCount = Object.keys(secretsToPush).length;
+      const secretCount = Object.keys(secretsToPush).length;
+      const varsCount = Object.keys(varsToPush).length;
 
-      if (keyCount === 0) {
+      if (secretCount === 0 && varsCount === 0) {
         const reason = args.shared ? " (no shared keys for this app)" : "";
-        consola.warn(`  No secrets to push for ${app.name}${reason}. Skipping.`);
+        consola.warn(`  Nothing to push for ${app.name}${reason}. Skipping.`);
         continue;
       }
 
       if (args["dry-run"]) {
-        consola.info(`  Would push ${keyCount} secrets to worker "${workerName}"`);
-        for (const key of Object.keys(secretsToPush)) {
-          const isShared = sharedKeys.has(key) ? " (shared)" : "";
-          consola.log(`    ${key}${isShared}`);
+        if (secretCount > 0) {
+          consola.info(`  Would push ${secretCount} secrets to worker "${workerName}"`);
+          for (const key of Object.keys(secretsToPush)) {
+            const isShared = sharedKeys.has(key) ? " (shared)" : "";
+            consola.log(`    ${key}${isShared}`);
+          }
+        }
+        if (varsCount > 0) {
+          consola.info(`  Would write ${varsCount} vars to wrangler config`);
+          for (const key of Object.keys(varsToPush)) {
+            const isShared = sharedKeys.has(key) ? " (shared)" : "";
+            consola.log(`    ${key}${isShared}`);
+          }
         }
         continue;
       }
 
       if (!args.force) {
+        const parts: string[] = [];
+        if (secretCount > 0) parts.push(`${secretCount} secrets`);
+        if (varsCount > 0) parts.push(`${varsCount} vars`);
         const confirmed = await consola.prompt(
-          `  Push ${keyCount} secrets to worker "${workerName}" (${environment})?`,
+          `  Push ${parts.join(" + ")} to "${workerName}" (${environment})?`,
           { type: "confirm" },
         );
         if (!confirmed) {
@@ -165,18 +189,32 @@ export default defineCommand({
         }
       }
 
-      const result = await pushSecrets(
-        workerName,
-        secretsToPush,
-        environment,
-        app.absolutePath,
-      );
+      // Push secrets via wrangler secret bulk
+      if (secretCount > 0) {
+        const result = await pushSecrets(
+          workerName,
+          secretsToPush,
+          environment,
+          app.absolutePath,
+        );
 
-      if (result.success) {
-        consola.success(`  Pushed ${keyCount} secrets to ${workerName}`);
-      } else {
-        consola.error(`  Failed to push secrets to ${workerName}`);
-        hasFailure = true;
+        if (result.success) {
+          consola.success(`  Pushed ${secretCount} secrets to ${workerName}`);
+        } else {
+          consola.error(`  Failed to push secrets to ${workerName}`);
+          hasFailure = true;
+        }
+      }
+
+      // Write vars to wrangler.jsonc
+      if (varsCount > 0) {
+        const varsResult = await updateWranglerVars(app.absolutePath, varsToPush);
+        if (varsResult.success) {
+          consola.success(`  Wrote ${varsCount} vars to ${varsResult.filePath}`);
+        } else {
+          consola.error(`  No wrangler.jsonc found in ${app.absolutePath}. Cannot write vars.`);
+          hasFailure = true;
+        }
       }
     }
 
