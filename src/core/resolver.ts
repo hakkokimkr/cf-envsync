@@ -38,8 +38,9 @@ export async function resolveAppEnv(
     layers.push({ source: rootEnvPath, map: rootEnv });
   }
 
-  // Layer 2: App-specific .env.{env} (if perApp enabled)
-  if (config.raw.envFiles.perApp) {
+  // Layer 2: App-specific .env.{env} (if perApp enabled, skip for local —
+  // local resolves to .env which conflicts with framework .env files in app dirs)
+  if (config.raw.envFiles.perApp && environment !== "local") {
     const appEnvPath = getAppEnvPath(config, app, environment);
     if (normalize(appEnvPath) !== normalize(rootEnvPath)) {
       const appEnv = await loadEnvFile(appEnvPath, environment, config.projectRoot, encryption);

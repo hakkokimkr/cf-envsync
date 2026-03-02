@@ -62,19 +62,20 @@ afterAll(async () => {
 });
 
 describe("resolveAppEnv", () => {
-  test("3-layer merge for local env (root + app + .env.local)", async () => {
+  test("2-layer merge for local env (root + .env.local, no per-app)", async () => {
     const app = config.apps.api!;
     const resolved = await resolveAppEnv(config, app, "local");
 
-    // app .env overrides root .env for DB
-    expect(resolved.map.DB).toBe("app_local_db");
+    // local env skips per-app layer (apps/api/.env conflicts with framework .env)
+    // so DB comes from root, not app
+    expect(resolved.map.DB).toBe("root_local");
     // root provides SHARED and API_URL
     expect(resolved.map.SHARED).toBe("root");
     expect(resolved.map.API_URL).toBe("http://localhost");
     // .env.local provides DEV_TUNNEL
     expect(resolved.map.DEV_TUNNEL).toBe("https://my-tunnel.dev");
-    // layers should include 3 sources
-    expect(resolved.layers.length).toBe(3);
+    // layers should include 2 sources (root + .env.local, no per-app)
+    expect(resolved.layers.length).toBe(2);
   });
 
   test("2-layer merge for non-local env (root + app, no .env.local)", async () => {
