@@ -169,7 +169,7 @@ export default defineCommand({
         workerName,
         secretsToPush,
         environment,
-        config.projectRoot,
+        app.absolutePath,
       );
 
       if (result.success) {

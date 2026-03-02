@@ -67,7 +67,7 @@ export default defineCommand({
       const remoteKeys = await listSecrets(
         workerName,
         environment,
-        config.projectRoot,
+        app.absolutePath,
       );
 
       if (remoteKeys.length === 0) {

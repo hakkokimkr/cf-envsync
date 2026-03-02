@@ -148,7 +148,7 @@ export default defineCommand({
 
         const [resolved, remoteKeys] = await Promise.all([
           resolveAppEnv(config, app, env1),
-          listSecrets(workerName, env1, config.projectRoot),
+          listSecrets(workerName, env1, app.absolutePath),
         ]);
 
         const localKeys = new Set(Object.keys(resolved.map));
