@@ -267,6 +267,40 @@ function detectIndent(content: string): string {
 }
 
 /**
+ * Re-indent a JSON.stringify result so that lines 2+ are offset by baseIndent.
+ * Line 1 (opening brace) stays inline; subsequent lines get the base prepended.
+ */
+function reindentJson(json: string, baseIndent: string): string {
+  return json.replace(/\n/g, `\n${baseIndent}`);
+}
+
+/**
+ * Insert a "key": value pair into a JSONC object before its closing brace.
+ * Handles trailing commas and whitespace properly.
+ */
+function insertIntoObject(
+  content: string,
+  objEnd: number,
+  key: string,
+  value: string,
+  keyIndent: string,
+  braceIndent: string,
+): string {
+  const closingBrace = objEnd - 1;
+
+  // Find end of last property (skip whitespace before closing brace)
+  let pos = closingBrace - 1;
+  while (pos >= 0 && (content[pos] === " " || content[pos] === "\t" || content[pos] === "\n" || content[pos] === "\r")) pos--;
+
+  const needsComma = pos >= 0 && content[pos] !== "," && content[pos] !== "{";
+  const comma = needsComma ? "," : "";
+  pos++;
+
+  const insertion = `${comma}\n${keyIndent}"${key}": ${value}\n${braceIndent}`;
+  return content.slice(0, pos) + insertion + content.slice(closingBrace);
+}
+
+/**
  * Update vars in an app's wrangler.jsonc/wrangler.json under `env.{environment}.vars`.
  * Surgically replaces only the vars value, preserving all comments and formatting.
  */
@@ -289,7 +323,7 @@ export async function updateWranglerVars(
   const existingVars = (envSection[environment]?.vars as Record<string, string>) ?? {};
   const mergedVars = { ...existingVars, ...vars };
 
-  const varsJson = JSON.stringify(mergedVars, null, indent);
+  const varsJson = reindentJson(JSON.stringify(mergedVars, null, indent), indent.repeat(3));
 
   // Try to find env.{environment}.vars and replace surgically
   const envRange = findKeyRange(content, "env");
@@ -303,32 +337,24 @@ export async function updateWranglerVars(
         await writeFile(configPath, content);
         return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
       }
-      // env.{environment} exists but no vars — insert before closing }
-      const insertAt = envObjRange[1] - 1;
-      const envIndent = indent.repeat(3);
-      const insertion = `,\n${envIndent}"vars": ${varsJson}\n${indent.repeat(2)}`;
-      content = content.slice(0, insertAt) + insertion + content.slice(insertAt);
+      // env.{environment} exists but no vars
+      content = insertIntoObject(content, envObjRange[1], "vars", varsJson, indent.repeat(3), indent.repeat(2));
       await writeFile(configPath, content);
       return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
     }
-    // env exists but no {environment} section — insert before env closing }
-    const insertAt = envRange[1] - 1;
-    const envIndent = indent.repeat(2);
-    const inner = `{\n${indent.repeat(3)}"vars": ${varsJson}\n${envIndent}}`;
-    const insertion = `,\n${envIndent}"${environment}": ${inner}\n${indent}`;
-    content = content.slice(0, insertAt) + insertion + content.slice(insertAt);
+    // env exists but no {environment} section
+    const inner = `{\n${indent.repeat(3)}"vars": ${varsJson}\n${indent.repeat(2)}}`;
+    content = insertIntoObject(content, envRange[1], environment, inner, indent.repeat(2), indent);
     await writeFile(configPath, content);
     return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
   }
 
-  // No env section at all — insert before top-level closing }
+  // No env section at all
   const lastBrace = content.lastIndexOf("}");
-  const envIndent = indent;
   const inner =
     `{\n${indent.repeat(2)}"${environment}": ` +
     `{\n${indent.repeat(3)}"vars": ${varsJson}\n${indent.repeat(2)}}\n${indent}}`;
-  const insertion = `,\n${envIndent}"env": ${inner}\n`;
-  content = content.slice(0, lastBrace) + insertion + content.slice(lastBrace);
+  content = insertIntoObject(content, lastBrace + 1, "env", inner, indent, "");
   await writeFile(configPath, content);
   return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
 }

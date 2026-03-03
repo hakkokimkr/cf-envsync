@@ -280,4 +280,49 @@ describe("updateWranglerVars", () => {
     const result = await updateWranglerVars(tmpDir, "staging", { A: "1" });
     expect(result.success).toBe(false);
   });
+
+  test("inserts vars after trailing comma without double comma", async () => {
+    writeFileSync(join(tmpDir, "wrangler.jsonc"), `{
+  "name": "my-api",
+  "env": {
+    "staging": {
+      "name": "my-api-staging",
+      "queues": {
+        "producers": []
+      },
+    }
+  }
+}
+`);
+
+    await updateWranglerVars(tmpDir, "staging", { PROJECT_ENV: "staging" });
+    const content = readFileSync(join(tmpDir, "wrangler.jsonc"), "utf-8");
+    // Should not have double comma
+    expect(content).not.toMatch(/,\s*,/);
+    // Should be valid JSONC
+    const stripped = content.replace(/\/\/.*/g, "").replace(/,(\s*[}\]])/g, "$1");
+    const parsed = JSON.parse(stripped);
+    expect(parsed.env.staging.vars.PROJECT_ENV).toBe("staging");
+    expect(parsed.env.staging.name).toBe("my-api-staging");
+  });
+
+  test("indents vars correctly at deep nesting", async () => {
+    writeFileSync(join(tmpDir, "wrangler.jsonc"), `{
+  "name": "my-api",
+  "env": {
+    "staging": {
+      "name": "my-api-staging"
+    }
+  }
+}
+`);
+
+    await updateWranglerVars(tmpDir, "staging", { API_URL: "https://staging.example.com", ENVIRONMENT: "staging" });
+    const content = readFileSync(join(tmpDir, "wrangler.jsonc"), "utf-8");
+    // Vars keys should be indented at 8 spaces (level 4)
+    expect(content).toMatch(/^ {8}"API_URL"/m);
+    expect(content).toMatch(/^ {8}"ENVIRONMENT"/m);
+    // Vars closing brace should be at 6 spaces (level 3)
+    expect(content).toMatch(/^ {6}\}/m);
+  });
 });
