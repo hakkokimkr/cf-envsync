@@ -18,6 +18,7 @@ const main = defineCommand({
     merge: () => import("./commands/merge.ts").then((m) => m.default),
     list: () => import("./commands/list.ts").then((m) => m.default),
     encrypt: () => import("./commands/encrypt.ts").then((m) => m.default),
+    clean: () => import("./commands/clean.ts").then((m) => m.default),
   },
 });
 

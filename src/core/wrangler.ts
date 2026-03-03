@@ -332,3 +332,128 @@ export async function updateWranglerVars(
   await writeFile(configPath, content);
   return { success: true, filePath: configPath, updatedCount: Object.keys(vars).length };
 }
+
+/**
+ * Find the full range of a "key": value entry in raw JSONC text.
+ * Returns [keyStart, valueEnd] where keyStart is the `"` of the key name.
+ */
+function findFullKeyRange(text: string, key: string, searchStart = 0): [number, number] | undefined {
+  const needle = `"${key}"`;
+  let i = searchStart;
+  let inString = false;
+
+  while (i < text.length) {
+    if (inString) {
+      if (text[i] === "\\" && i + 1 < text.length) { i += 2; continue; }
+      if (text[i] === '"') inString = false;
+      i++;
+      continue;
+    }
+    if (text[i] === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i++;
+      continue;
+    }
+    if (text[i] === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+    if (text.startsWith(needle, i)) {
+      const keyStart = i;
+      let j = i + needle.length;
+      while (j < text.length && (text[j] === " " || text[j] === "\t" || text[j] === "\n" || text[j] === "\r")) j++;
+      if (text[j] === ":") {
+        j++;
+        while (j < text.length && (text[j] === " " || text[j] === "\t" || text[j] === "\n" || text[j] === "\r")) j++;
+        const end = findValueEnd(text, j);
+        return [keyStart, end];
+      }
+    }
+    if (text[i] === '"') { inString = true; i++; continue; }
+    i++;
+  }
+  return undefined;
+}
+
+/**
+ * Remove a "key": value entry from JSONC text, handling commas properly.
+ * Only finds keys between searchStart and searchEnd.
+ */
+function removeJsoncKey(text: string, key: string, searchStart: number, searchEnd: number): string | undefined {
+  const range = findFullKeyRange(text, key, searchStart);
+  if (!range || range[0] >= searchEnd) return undefined;
+
+  const [keyStart, valueEnd] = range;
+  let removeStart = keyStart;
+  let removeEnd = valueEnd;
+
+  // Look backward past whitespace for a preceding comma
+  let b = keyStart - 1;
+  while (b >= 0 && (text[b] === " " || text[b] === "\t" || text[b] === "\n" || text[b] === "\r")) b--;
+
+  if (b >= 0 && text[b] === ",") {
+    // Remove preceding comma + whitespace + entry
+    removeStart = b;
+  } else {
+    // No preceding comma — look for trailing comma
+    let a = valueEnd;
+    while (a < text.length && (text[a] === " " || text[a] === "\t" || text[a] === "\n" || text[a] === "\r")) a++;
+    if (a < text.length && text[a] === ",") {
+      removeEnd = a + 1;
+    }
+    // Also eat leading whitespace on the current line
+    let lineStart = keyStart - 1;
+    while (lineStart >= 0 && (text[lineStart] === " " || text[lineStart] === "\t")) lineStart--;
+    if (lineStart >= 0 && text[lineStart] === "\n") {
+      removeStart = lineStart;
+    }
+  }
+
+  return text.slice(0, removeStart) + text.slice(removeEnd);
+}
+
+/**
+ * Remove `env.{environment}.vars` from an app's wrangler.jsonc/wrangler.json.
+ * Preserves all comments and other configuration.
+ */
+export async function removeWranglerVars(
+  appPath: string,
+  environments: string[],
+  dryRun = false,
+): Promise<{ success: boolean; filePath?: string; removedCount: number }> {
+  const configPath = findWranglerConfig(appPath);
+  if (!configPath) {
+    return { success: true, removedCount: 0 };
+  }
+
+  let content = await readFile(configPath);
+  const parsed = JSON.parse(stripJsonc(content)) as Record<string, unknown>;
+  const envSection = (parsed?.env as Record<string, Record<string, unknown>>) ?? {};
+
+  let removedCount = 0;
+
+  for (const environment of environments) {
+    if (!envSection[environment]?.vars) continue;
+    removedCount++;
+    if (dryRun) continue;
+
+    // Re-find ranges each time since content shifts after each removal
+    const envRange = findKeyRange(content, "env");
+    if (!envRange) continue;
+
+    const envObjRange = findKeyRange(content, environment, envRange[0]);
+    if (!envObjRange) continue;
+
+    const result = removeJsoncKey(content, "vars", envObjRange[0], envObjRange[1]);
+    if (result !== undefined) {
+      content = result;
+    }
+  }
+
+  if (!dryRun && removedCount > 0) {
+    await writeFile(configPath, content);
+  }
+
+  return { success: true, filePath: configPath, removedCount };
+}
