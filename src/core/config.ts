@@ -80,9 +80,6 @@ export function validateConfig(config: EnvSyncConfig): string[] {
     if (!app.path) {
       errors.push(`App "${name}" is missing "path" field`);
     }
-    if (!app.workers || Object.keys(app.workers).length === 0) {
-      errors.push(`App "${name}" is missing "workers" mapping`);
-    }
     if ((!app.secrets || app.secrets.length === 0) && (!app.vars || app.vars.length === 0)) {
       errors.push(`App "${name}" has no "secrets" or "vars" declared`);
     }
@@ -186,7 +183,7 @@ export function getWorkerName(
   app: ResolvedAppConfig,
   environment: string,
 ): string | undefined {
-  return app.workers[environment];
+  return app.workers?.[environment];
 }
 
 /**

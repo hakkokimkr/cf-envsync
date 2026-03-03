@@ -35,8 +35,8 @@ export interface EnvSyncConfig {
 export interface AppConfig {
   /** Path to app directory relative to project root */
   path: string;
-  /** Cloudflare Worker names per environment */
-  workers: Record<string, string>;
+  /** Cloudflare Worker names per environment (omit for non-worker apps) */
+  workers?: Record<string, string>;
   /** Secret keys for this app (pushed via wrangler secret) */
   secrets?: string[];
   /** Var keys for this app (non-secret env vars) */

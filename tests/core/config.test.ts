@@ -53,15 +53,15 @@ describe("validateConfig", () => {
     expect(errors.some((e) => e.includes("pattern"))).toBe(true);
   });
 
-  test("reports missing workers", () => {
+  test("allows apps without workers", () => {
     const config: EnvSyncConfig = {
       ...validConfig,
       apps: {
-        api: { path: "apps/api", workers: {}, secrets: ["KEY"] },
+        database: { path: "packages/database", vars: ["DATABASE_URL"] },
       },
     };
     const errors = validateConfig(config);
-    expect(errors.some((e) => e.includes("workers"))).toBe(true);
+    expect(errors.some((e) => e.includes("workers"))).toBe(false);
   });
 
   test("reports no secrets or vars", () => {

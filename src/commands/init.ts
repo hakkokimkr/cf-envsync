@@ -44,11 +44,13 @@ function generateConfigTS(config: EnvSyncConfig): string {
   for (const [name, app] of Object.entries(config.apps)) {
     lines.push(`    ${quoteKey(name)}: {`);
     lines.push(`      path: ${JSON.stringify(app.path)},`);
-    lines.push(`      workers: {`);
-    for (const [env, worker] of Object.entries(app.workers)) {
-      lines.push(`        ${quoteKey(env)}: ${JSON.stringify(worker)},`);
+    if (app.workers && Object.keys(app.workers).length > 0) {
+      lines.push(`      workers: {`);
+      for (const [env, worker] of Object.entries(app.workers)) {
+        lines.push(`        ${quoteKey(env)}: ${JSON.stringify(worker)},`);
+      }
+      lines.push(`      },`);
     }
-    lines.push(`      },`);
     if (app.secrets?.length) {
       lines.push(`      secrets: ${JSON.stringify(app.secrets)},`);
     }
