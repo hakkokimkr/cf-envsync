@@ -44,6 +44,8 @@ export interface AppConfig {
   /** Output file(s) for `envsync dev`. Defaults to ".dev.vars".
    *  Use an array to generate multiple files, e.g. [".dev.vars", ".env.local"] */
   devFile?: string | string[];
+  /** Whether to include this app in `envsync validate`. Defaults to true. */
+  validate?: boolean;
 }
 
 /** Resolved config after defaults and path resolution */

@@ -65,7 +65,13 @@ export default defineCommand({
       appNames = undefined;
     }
 
-    const apps = resolveApps(config, appNames);
+    const allApps = resolveApps(config, appNames);
+    const apps = allApps.filter((app) => app.validate !== false);
+
+    if (apps.length === 0) {
+      consola.info("All resolved apps have validate: false. Nothing to validate.");
+      return;
+    }
 
     // Load .env.example as reference
     const examplePath = join(config.projectRoot, ".env.example");

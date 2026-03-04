@@ -65,6 +65,100 @@ describe("validate command", () => {
   });
 });
 
+describe("validate command (validate: false)", () => {
+  const tmpDirs: string[] = [];
+
+  afterAll(async () => {
+    for (const d of tmpDirs) {
+      await rm(d, { recursive: true }).catch(() => {});
+    }
+  });
+
+  async function setupProject(config: object) {
+    const tmpDir = await mkdtemp(join(tmpdir(), "envsync-validate-skip-"));
+    tmpDirs.push(tmpDir);
+    await writeFile(join(tmpDir, "envsync.json"), JSON.stringify(config));
+    await writeFile(join(tmpDir, ".env.example"), "KEY=\n");
+    await writeFile(join(tmpDir, ".env"), "KEY=val\n");
+    await writeFile(join(tmpDir, ".env.staging"), "KEY=val\n");
+    return tmpDir;
+  }
+
+  test("app with validate: false is skipped", async () => {
+    const tmpDir = await setupProject({
+      environments: ["local", "staging"],
+      envFiles: { pattern: ".env.{env}", local: ".env.local", perApp: false },
+      encryption: "none",
+      apps: {
+        main: { path: ".", secrets: ["KEY"] },
+        skipped: { path: ".", secrets: ["KEY"], validate: false },
+      },
+    });
+    const proc = Bun.spawn(
+      [process.execPath, "run", CLI, "validate", "staging"],
+      { cwd: tmpDir, stdout: "pipe", stderr: "pipe", env: spawnEnv },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    const output = stdout + stderr;
+    expect(exitCode).toBe(0);
+    expect(output).toContain("main");
+    expect(output).not.toContain("skipped");
+    // Count display should show 1 app, not 2
+    expect(output).toContain("1 app");
+  });
+
+  test("all apps with validate: false shows info and exits 0", async () => {
+    const tmpDir = await setupProject({
+      environments: ["local", "staging"],
+      envFiles: { pattern: ".env.{env}", local: ".env.local", perApp: false },
+      encryption: "none",
+      apps: {
+        a: { path: ".", secrets: ["KEY"], validate: false },
+        b: { path: ".", secrets: ["KEY"], validate: false },
+      },
+    });
+    const proc = Bun.spawn(
+      [process.execPath, "run", CLI, "validate"],
+      { cwd: tmpDir, stdout: "pipe", stderr: "pipe", env: spawnEnv },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    const output = stdout + stderr;
+    expect(exitCode).toBe(0);
+    expect(output).toContain("Nothing to validate");
+  });
+
+  test("requesting a validate: false app by name still skips it", async () => {
+    const tmpDir = await setupProject({
+      environments: ["local", "staging"],
+      envFiles: { pattern: ".env.{env}", local: ".env.local", perApp: false },
+      encryption: "none",
+      apps: {
+        skipped: { path: ".", secrets: ["KEY"], validate: false },
+      },
+    });
+    const proc = Bun.spawn(
+      [process.execPath, "run", CLI, "validate", "skipped"],
+      { cwd: tmpDir, stdout: "pipe", stderr: "pipe", env: spawnEnv },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    const output = stdout + stderr;
+    expect(exitCode).toBe(0);
+    expect(output).toContain("Nothing to validate");
+  });
+});
+
 describe("validate command (ambiguity detection)", () => {
   const tmpDirs: string[] = [];
 
