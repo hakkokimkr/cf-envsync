@@ -75,6 +75,9 @@ pnpm add -D cf-envsync
 # Initialize (scans wrangler.jsonc files in monorepos)
 npx envsync init --monorepo
 
+# Set up Claude Code integration (recommended)
+npx envsync claude-setup
+
 # Generate .dev.vars for local development
 npx envsync dev
 
@@ -222,7 +225,33 @@ npx envsync validate
 
 ---
 
+## Claude Code Integration
+
+**envsync는 [Claude Code](https://claude.ai/code) 커스텀 슬래시 커맨드를 기본 제공합니다.** 한 번만 설정하면 Claude Code가 환경 변수 관련 작업을 자동으로 envsync 커맨드로 처리합니다.
+
+```bash
+npx envsync claude-setup
+```
+
+이 커맨드는 `.claude/commands/envsync.md`를 생성합니다. 이후 Claude Code에서 `/project:envsync`로 호출하거나, "환경 변수 추가해줘"같은 요청 시 자동으로 `envsync set/unset`을 사용합니다.
+
+> `.claude/commands/envsync.md`는 git에 커밋하세요. 팀원 모두 별도 설정 없이 바로 사용할 수 있습니다.
+
+---
+
 ## Commands
+
+### `envsync set` / `unset` — Add, update, remove env vars
+
+The simplest way to manage individual keys.
+
+```bash
+npx envsync set staging API_KEY sk-123456    # Add or update (auto-encrypts)
+npx envsync set staging API_KEY sk-123456 --raw  # Store without encrypting
+npx envsync unset staging API_KEY            # Remove
+```
+
+---
 
 ### `envsync dev` — Generate `.dev.vars`
 
@@ -723,7 +752,7 @@ No SaaS. No dashboard. Just a CLI, your `.env` files, and Cloudflare's API.
 
 ## Testing
 
-150 tests across 20 files covering utils, core modules, and all 10 commands.
+180 tests across 21 files covering utils, core modules, and all commands.
 
 ```bash
 bun test              # Run tests
