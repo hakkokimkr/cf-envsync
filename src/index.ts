@@ -19,6 +19,9 @@ const main = defineCommand({
     list: () => import("./commands/list.ts").then((m) => m.default),
     encrypt: () => import("./commands/encrypt.ts").then((m) => m.default),
     clean: () => import("./commands/clean.ts").then((m) => m.default),
+    set: () => import("./commands/set.ts").then((m) => m.default),
+    unset: () => import("./commands/unset.ts").then((m) => m.default),
+    "claude-setup": () => import("./commands/claude-setup.ts").then((m) => m.default),
   },
 });
 

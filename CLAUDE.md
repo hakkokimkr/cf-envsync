@@ -8,7 +8,7 @@ CLI tool that syncs `.env` files to Cloudflare Workers secrets, `.dev.vars`, and
 src/
 ├── index.ts              # CLI entry (citty runMain, lazy subCommands)
 ├── define-config.ts      # Public API: defineConfig() + type exports
-├── commands/             # 9 commands: dev, push, pull, validate, diff, init, normalize, merge, list
+├── commands/             # 13 commands: dev, push, pull, validate, diff, init, normalize, merge, list, encrypt, clean, set, unset
 ├── core/                 # config.ts, env-file.ts, encryption.ts, resolver.ts, wrangler.ts
 ├── types/                # config.ts (EnvSyncConfig, AppConfig), env.ts (EnvMap, DiffEntry, etc.)
 └── utils/                # fs.ts, process.ts, output.ts
