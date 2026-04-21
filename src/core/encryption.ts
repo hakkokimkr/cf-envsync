@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "@dotenvx/dotenvx";
 import { scryptSync, randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { parsePlainEnv } from "../utils/env-parse.ts";
 
 /**
  * Parse and decrypt .env file content using dotenvx.
@@ -29,27 +30,12 @@ export function decryptEnvContent(
 }
 
 /**
- * Load key-value pairs from a `.env.keys` file.
- * Lines starting with `#` or blank lines are ignored.
+ * Load key-value pairs from a `.env.keys` or `.env.password` file.
+ * Returns an empty object if the file does not exist.
  */
 function loadEnvKeysFileSync(filePath: string): Record<string, string> {
   try {
-    const content = readFileSync(filePath, "utf-8");
-    const result: Record<string, string> = {};
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (trimmed === "" || trimmed.startsWith("#")) continue;
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx === -1) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let value = trimmed.slice(eqIdx + 1).trim();
-      // Strip surrounding quotes
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      result[key] = value;
-    }
-    return result;
+    return parsePlainEnv(readFileSync(filePath, "utf-8"));
   } catch {
     return {};
   }

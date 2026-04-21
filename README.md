@@ -241,13 +241,15 @@ npx envsync claude-setup
 
 ## Commands
 
-### `envsync set` / `unset` — Add, update, remove env vars
+### `envsync set` / `get` / `unset` — Add, read, remove env vars
 
 The simplest way to manage individual keys.
 
 ```bash
 npx envsync set staging API_KEY sk-123456    # Add or update (auto-encrypts)
 npx envsync set staging API_KEY sk-123456 --raw  # Store without encrypting
+npx envsync get staging API_KEY              # Read (auto-decrypts)
+npx envsync get staging API_KEY --raw        # Print raw stored value
 npx envsync unset staging API_KEY            # Remove
 ```
 

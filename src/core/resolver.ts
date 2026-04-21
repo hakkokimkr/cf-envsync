@@ -75,28 +75,6 @@ export async function resolveAppEnv(
 }
 
 /**
- * Find keys that appear in all apps (shared across apps).
- */
-export function findSharedValues(
-  appEnvs: Map<string, EnvMap>,
-): { key: string; value: string }[] {
-  const allApps = Array.from(appEnvs.values());
-  if (allApps.length === 0) return [];
-
-  const firstApp = allApps[0]!;
-  const shared: { key: string; value: string }[] = [];
-
-  for (const [key, value] of Object.entries(firstApp)) {
-    const isShared = allApps.every((env) => env[key] === value);
-    if (isShared) {
-      shared.push({ key, value });
-    }
-  }
-
-  return shared;
-}
-
-/**
  * Check for missing per-developer override keys.
  * Returns keys that are declared in local.overrides or local.perApp
  * but not present in .env.local.

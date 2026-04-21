@@ -27,29 +27,6 @@ export function printTree(
 }
 
 /**
- * Print a simple key-value table.
- */
-export function printTable(
-  headers: string[],
-  rows: string[][],
-): void {
-  const colWidths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
-  );
-
-  const sep = colWidths.map((w) => "─".repeat(w + 2)).join("┼");
-  const formatRow = (row: string[]) =>
-    row.map((cell, i) => ` ${cell.padEnd(colWidths[i]!)} `).join("│");
-
-  consola.log(formatRow(headers));
-  consola.log(sep);
-  for (const row of rows) {
-    consola.log(formatRow(row));
-  }
-  consola.log("");
-}
-
-/**
  * Print a diff view of env changes.
  */
 export function printDiff(entries: DiffEntry[]): void {
@@ -76,9 +53,10 @@ export function printDiff(entries: DiffEntry[]): void {
 
 /**
  * Mask a secret value for display: show first 4 chars + "***".
+ * `missingLabel` is used when the value is undefined or empty (defaults to "(empty)").
  */
-export function maskValue(value?: string): string {
-  if (!value) return "(empty)";
+export function maskValue(value?: string, missingLabel = "(empty)"): string {
+  if (!value) return missingLabel;
   if (value.length <= 4) return "****";
   return value.slice(0, 4) + "****";
 }

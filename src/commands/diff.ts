@@ -1,15 +1,12 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig, resolveApps, getWorkerName } from "../core/config.ts";
+import { resolveApps, getWorkerName } from "../core/config.ts";
 import { resolveAppEnv } from "../core/resolver.ts";
 import { checkWrangler, listSecrets } from "../core/wrangler.ts";
-import { printDiff } from "../utils/output.ts";
+import { printDiff, maskValue } from "../utils/output.ts";
 import type { DiffEntry, EnvDiffEntry } from "../types/env.ts";
-
-function parseAppNames(args: { _?: string[] }, skip: number): string[] | undefined {
-  const rest = args._?.slice(skip);
-  return rest?.length ? rest : undefined;
-}
+import { parseAppNames } from "../utils/args.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -29,22 +26,8 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
     const env1 = args.env as string;
-
-    if (!config.environments.includes(env1)) {
-      consola.error(
-        `Unknown environment: "${env1}". Available: ${config.environments.join(", ")}`,
-      );
-      process.exit(1);
-    }
+    const config = await loadResolvedConfig(env1);
 
     // Determine mode: env-vs-env or local-vs-remote
     const target = args.target as string | undefined;
@@ -111,7 +94,7 @@ export default defineCommand({
             `missing in ${env1}!`;
 
           consola.log(
-            `    ${entry.key.padEnd(24)} ${maskValue(entry.leftValue).padEnd(20)} ${maskValue(entry.rightValue).padEnd(20)} ${icon} ${label}`,
+            `    ${entry.key.padEnd(24)} ${maskValue(entry.leftValue, "(missing)").padEnd(20)} ${maskValue(entry.rightValue, "(missing)").padEnd(20)} ${icon} ${label}`,
           );
         }
 
@@ -188,9 +171,3 @@ export default defineCommand({
     }
   },
 });
-
-function maskValue(value?: string): string {
-  if (value === undefined) return "(missing)";
-  if (value.length <= 4) return "****";
-  return value.slice(0, 4) + "****";
-}

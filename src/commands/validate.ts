@@ -1,16 +1,13 @@
 import { defineCommand } from "citty";
 import { join } from "node:path";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig, resolveApps } from "../core/config.ts";
+import { resolveApps } from "../core/config.ts";
 import { resolveAppEnv, findMissingOverrides } from "../core/resolver.ts";
 import { loadEnvFile, getLocalOverridePath } from "../core/env-file.ts";
 import { fileExists } from "../utils/fs.ts";
 import type { ValidationResult } from "../types/env.ts";
-
-function parseAppNames(args: { _?: string[] }, skip = 1): string[] | undefined {
-  const rest = args._?.slice(skip);
-  return rest?.length ? rest : undefined;
-}
+import { parseAppNames } from "../utils/args.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -25,14 +22,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
+    const config = await loadResolvedConfig();
 
     // Determine which environments to validate
     const envArg = args.env as string | undefined;

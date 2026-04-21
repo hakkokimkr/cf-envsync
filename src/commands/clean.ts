@@ -2,9 +2,9 @@ import { defineCommand } from "citty";
 import { join, relative } from "node:path";
 import { unlinkSync } from "node:fs";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig } from "../core/config.ts";
 import { removeWranglerVars } from "../core/wrangler.ts";
 import { fileExists } from "../utils/fs.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -19,14 +19,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
+    const config = await loadResolvedConfig();
     const apps = Object.values(config.apps);
 
     if (apps.length === 0) {

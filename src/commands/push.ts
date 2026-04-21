@@ -1,14 +1,11 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig, resolveApps, getWorkerName } from "../core/config.ts";
+import { resolveApps, getWorkerName } from "../core/config.ts";
 import { resolveAppEnv } from "../core/resolver.ts";
 import { checkWrangler, pushSecrets, updateWranglerVars } from "../core/wrangler.ts";
 import type { EnvMap } from "../types/env.ts";
-
-function parseAppNames(args: { _?: string[] }, skip = 1): string[] | undefined {
-  const rest = args._?.slice(skip);
-  return rest?.length ? rest : undefined;
-}
+import { parseAppNames } from "../utils/args.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -53,21 +50,7 @@ export default defineCommand({
       }
     }
 
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
-
-    if (!config.environments.includes(environment)) {
-      consola.error(
-        `Unknown environment: "${environment}". Available: ${config.environments.join(", ")}`,
-      );
-      process.exit(1);
-    }
+    const config = await loadResolvedConfig(environment);
 
     const appNames = parseAppNames(args as unknown as { _?: string[] });
     const apps = resolveApps(config, appNames);

@@ -2,7 +2,7 @@ import { describe, test, expect, afterAll } from "bun:test";
 import { join } from "node:path";
 import { mkdtemp, rm, writeFile as _writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { resolveAppEnv, findSharedValues } from "../../src/core/resolver.ts";
+import { resolveAppEnv } from "../../src/core/resolver.ts";
 import { resolveConfig } from "../../src/core/config.ts";
 import type { EnvSyncConfig, ResolvedConfig } from "../../src/types/config.ts";
 
@@ -133,30 +133,3 @@ describe("resolveAppEnv with perApp=false", () => {
   });
 });
 
-describe("findSharedValues", () => {
-  test("finds common keys across apps", () => {
-    const appEnvs = new Map<string, Record<string, string>>([
-      ["api", { JWT: "secret", DB: "pg://a" }],
-      ["web", { JWT: "secret", AUTH: "x" }],
-    ]);
-
-    const shared = findSharedValues(appEnvs);
-    expect(shared).toEqual([{ key: "JWT", value: "secret" }]);
-  });
-
-  test("single app returns all keys as shared", () => {
-    const appEnvs = new Map<string, Record<string, string>>([
-      ["api", { A: "1", B: "2" }],
-    ]);
-
-    const shared = findSharedValues(appEnvs);
-    expect(shared.length).toBe(2);
-    expect(shared).toContainEqual({ key: "A", value: "1" });
-    expect(shared).toContainEqual({ key: "B", value: "2" });
-  });
-
-  test("empty input returns empty", () => {
-    const shared = findSharedValues(new Map());
-    expect(shared).toEqual([]);
-  });
-});

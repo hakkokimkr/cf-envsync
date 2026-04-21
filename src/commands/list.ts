@@ -1,10 +1,11 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig, resolveApps, getWorkerName } from "../core/config.ts";
+import { resolveApps, getWorkerName } from "../core/config.ts";
 import { resolveAppEnv } from "../core/resolver.ts";
 import { getRootEnvPath, loadEnvFile, getLocalOverridePath } from "../core/env-file.ts";
 import { fileExists } from "../utils/fs.ts";
 import { printTree } from "../utils/output.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -24,14 +25,7 @@ export default defineCommand({
     },
   },
   async run({ args }) {
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
+    const config = await loadResolvedConfig();
     const appNames = args.app ? [args.app as string] : undefined;
     const apps = resolveApps(config, appNames);
 

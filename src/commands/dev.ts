@@ -1,14 +1,11 @@
 import { defineCommand } from "citty";
 import { join, relative } from "node:path";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig, resolveApps } from "../core/config.ts";
+import { resolveApps } from "../core/config.ts";
 import { resolveAppEnv, findMissingOverrides } from "../core/resolver.ts";
 import { writeEnvFile, getLocalOverridePath, loadEnvFile } from "../core/env-file.ts";
-
-function parseAppNames(args: { _?: string[] }): string[] | undefined {
-  const rest = args._;
-  return rest?.length ? rest : undefined;
-}
+import { parseAppNames } from "../utils/args.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 /**
  * Format a source path for display: relative path + annotation.
@@ -47,15 +44,8 @@ export default defineCommand({
   async run({ args }) {
     const environment = args.env || "local";
 
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
-    const appNames = parseAppNames(args as unknown as { _?: string[] });
+    const config = await loadResolvedConfig();
+    const appNames = parseAppNames(args as unknown as { _?: string[] }, 0);
     const apps = resolveApps(config, appNames);
 
     if (apps.length === 0) {

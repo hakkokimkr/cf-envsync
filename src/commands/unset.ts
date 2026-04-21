@@ -1,8 +1,8 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig } from "../core/config.ts";
 import { getRootEnvPath, parsePlainEnv, writeEnvFile } from "../core/env-file.ts";
 import { fileExists, readFile } from "../utils/fs.ts";
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -25,21 +25,7 @@ export default defineCommand({
     const environment = args.env as string;
     const key = args.key as string;
 
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
-
-    if (!config.environments.includes(environment)) {
-      consola.error(
-        `Unknown environment: "${environment}". Available: ${config.environments.join(", ")}`,
-      );
-      process.exit(1);
-    }
+    const config = await loadResolvedConfig(environment);
 
     const envFilePath = getRootEnvPath(config, environment);
 

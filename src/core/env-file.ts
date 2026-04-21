@@ -3,29 +3,11 @@ import { consola } from "consola";
 import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap } from "./encryption.ts";
 import { resolveEnvFilePath } from "./config.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
+import { parsePlainEnv, parseEnvLines } from "../utils/env-parse.ts";
 import type { EnvEntry, EnvMap, ResolvedEnv } from "../types/env.ts";
 import type { ResolvedAppConfig, ResolvedConfig } from "../types/config.ts";
 
-/**
- * Parse plain KEY=VALUE content into an EnvMap.
- * Handles comments, blank lines, and quoted values.
- */
-export function parsePlainEnv(content: string): EnvMap {
-  const result: EnvMap = {};
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    let value = trimmed.slice(eqIdx + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    result[key] = value;
-  }
-  return result;
-}
+export { parsePlainEnv, parseEnvLines };
 
 /**
  * Load a .env file and parse its contents.

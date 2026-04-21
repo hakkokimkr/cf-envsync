@@ -1,30 +1,11 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { readFile, writeFile } from "../utils/fs.ts";
-import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap, encryptEnvMap, isEnvsyncEncrypted } from "../core/encryption.ts";
+import { decryptEnvContent, findPrivateKey, findPassword, decryptEnvMap, encryptEnvMap } from "../core/encryption.ts";
+import { parseEnvLines } from "../core/env-file.ts";
 import { exec } from "../utils/process.ts";
 
-/**
- * Parse .env content into an ordered list of entries.
- * Preserves comments and blank lines.
- */
-export function parseEnvLines(content: string): { key?: string; value?: string; raw: string }[] {
-  return content.split("\n").map((line) => {
-    const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) {
-      return { raw: line };
-    }
-    const eqIdx = line.indexOf("=");
-    if (eqIdx === -1) {
-      return { raw: line };
-    }
-    return {
-      key: line.slice(0, eqIdx).trim(),
-      value: line.slice(eqIdx + 1),
-      raw: line,
-    };
-  });
-}
+export { parseEnvLines };
 
 /**
  * Check if content appears to be dotenvx-encrypted.

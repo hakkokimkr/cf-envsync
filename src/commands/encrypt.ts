@@ -1,30 +1,9 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { loadConfig, validateConfig, resolveConfig } from "../core/config.ts";
-import { getRootEnvPath } from "../core/env-file.ts";
+import { getRootEnvPath, parseEnvLines } from "../core/env-file.ts";
 import { fileExists, readFile, writeFile } from "../utils/fs.ts";
 import { findPassword, encryptValue, decryptValue, isEnvsyncEncrypted } from "../core/encryption.ts";
-
-/**
- * Parse plain KEY=VALUE content preserving structure.
- */
-function parseLines(content: string): { key?: string; value?: string; raw: string }[] {
-  return content.split("\n").map((line) => {
-    const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) {
-      return { raw: line };
-    }
-    const eqIdx = line.indexOf("=");
-    if (eqIdx === -1) {
-      return { raw: line };
-    }
-    return {
-      key: line.slice(0, eqIdx).trim(),
-      value: line.slice(eqIdx + 1),
-      raw: line,
-    };
-  });
-}
+import { loadResolvedConfig } from "../utils/command.ts";
 
 export default defineCommand({
   meta: {
@@ -46,24 +25,10 @@ export default defineCommand({
   async run({ args }) {
     const environment = args.env as string;
 
-    const rawConfig = await loadConfig();
-    const errors = validateConfig(rawConfig);
-    if (errors.length > 0) {
-      for (const err of errors) consola.error(err);
-      process.exit(1);
-    }
-
-    const config = resolveConfig(rawConfig);
+    const config = await loadResolvedConfig(environment);
 
     if (config.raw.encryption !== "password") {
       consola.error('encrypt command requires encryption: "password" in config.');
-      process.exit(1);
-    }
-
-    if (!config.environments.includes(environment)) {
-      consola.error(
-        `Unknown environment: "${environment}". Available: ${config.environments.join(", ")}`,
-      );
       process.exit(1);
     }
 
@@ -82,7 +47,7 @@ export default defineCommand({
     }
 
     const content = await readFile(envFilePath);
-    const lines = parseLines(content);
+    const lines = parseEnvLines(content);
 
     // Verify current password against existing encrypted values
     const firstEncrypted = lines.find(
