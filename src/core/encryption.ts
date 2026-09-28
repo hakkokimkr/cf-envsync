@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "@dotenvx/dotenvx";
-import { scryptSync, randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { scryptSync, randomBytes, createCipheriv, createDecipheriv, createHash } from "node:crypto";
 import { parsePlainEnv } from "../utils/env-parse.ts";
 
 /**
@@ -72,6 +72,52 @@ export function findPrivateKey(env?: string, projectRoot?: string): string | und
 const ENVSYNC_PREFIX = "envsync:v1:";
 
 /**
+ * Cache for scrypt-derived keys, keyed by a hash of (salt, password).
+ *
+ * Why this exists (measured on enter.fun, 2026-09-28):
+ *
+ * Every encrypted value carries its own random salt, so `decryptValue` runs a
+ * fresh `scryptSync` per value — by design, and correct. The waste is one level
+ * up: `resolveAppEnv` re-reads and re-decrypts the *whole* root `.env.<env>`
+ * once per app, so the same (salt, password) pairs are derived over and over.
+ *
+ *   66 encrypted values x 13 apps = 858 scryptSync calls per `envsync dev`
+ *   858 calls = 16.0s on an M-series Mac, ~32s on a 2-vCPU CI runner
+ *   (matches the 32.1s measured for the "Decrypt env files" step in CI)
+ *
+ * With this cache only 66 derivations survive (-92%), because the 13 repeats
+ * per value are now lookups. scrypt stays exactly as slow as it is supposed to
+ * be for an *attacker* — a second derivation of an identical (salt, password)
+ * pair protects nothing, it just costs us 19ms.
+ *
+ * Scope and lifetime: a plain Map for the lifetime of the CLI process. The CLI
+ * already holds every decrypted secret in memory and writes them to disk, so
+ * keeping the derived keys alongside them does not widen the blast radius in
+ * any way that matters. The cache key is hashed rather than storing the raw
+ * password as a Map key — cheap defence in depth, nothing more.
+ */
+const derivedKeyCache = new Map<string, Buffer>();
+
+/**
+ * Derive the AES key for a (password, salt) pair, reusing a previous result.
+ *
+ * ⚠️ Must stay a pure function of its inputs — same inputs, same 32 bytes.
+ *    Do not add per-call state here or the cache becomes wrong, not just slow.
+ */
+function deriveKey(password: string, salt: Buffer): Buffer {
+  const cacheKey = createHash("sha256")
+    .update(salt)
+    .update(Buffer.from([0]))
+    .update(password, "utf8")
+    .digest("base64");
+  const cached = derivedKeyCache.get(cacheKey);
+  if (cached) return cached;
+  const key = scryptSync(password, salt, 32);
+  derivedKeyCache.set(cacheKey, key);
+  return key;
+}
+
+/**
  * Check if a value is encrypted with envsync password encryption.
  */
 export function isEnvsyncEncrypted(value: string): boolean {
@@ -105,7 +151,9 @@ export function decryptValue(token: string, password: string): string {
   const iv = payload.subarray(16, 28);
   const tag = payload.subarray(payload.length - 16);
   const encrypted = payload.subarray(28, payload.length - 16);
-  const key = scryptSync(password, salt, 32);
+  // 같은 (비밀번호, salt) 쌍은 재사용한다 — 위 derivedKeyCache 주석 참조.
+  // encryptValue 는 매번 새 salt 를 뽑으므로 캐시를 쓰지 않는다(적중 0 · 메모리만 는다).
+  const key = deriveKey(password, salt);
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
   return decipher.update(encrypted) + decipher.final("utf8");
